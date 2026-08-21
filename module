@@ -1,6 +1,6 @@
 --[[
     ModernUI Module - Полностью кастомизируемый интерфейс для скриптов
-    Версия: 1.0.1 (Исправлена ошибка split)
+    Версия: 1.0.2 (Исправлена ошибка конкатенации)
     Автор: AI Assistant
 ]]
 
@@ -11,6 +11,9 @@ local RunService = game:GetService("RunService")
 
 -- Вспомогательная функция для разделения строки
 local function splitString(str, delimiter)
+    if type(str) ~= "string" then
+        str = tostring(str)
+    end
     local result = {}
     for match in (str .. delimiter):gmatch("(.-)" .. delimiter) do
         table.insert(result, match)
