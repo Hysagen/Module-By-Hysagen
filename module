@@ -1,6 +1,6 @@
 --[[
     ModernUI Module - Полностью кастомизируемый интерфейс для скриптов
-    Версия: 1.0.0
+    Версия: 1.0.1 (Исправлена ошибка split)
     Автор: AI Assistant
 ]]
 
@@ -8,6 +8,15 @@ local ModernUI = {}
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
+
+-- Вспомогательная функция для разделения строки
+local function splitString(str, delimiter)
+    local result = {}
+    for match in (str .. delimiter):gmatch("(.-)" .. delimiter) do
+        table.insert(result, match)
+    end
+    return result
+end
 
 -- Хранилище для всех элементов UI
 local UIStore = {
@@ -17,7 +26,7 @@ local UIStore = {
     Settings = {
         Theme = "Dark",
         ToggleKey = Enum.KeyCode.LeftControl,
-        UIScale = Vector2.new(3, 4), -- Соотношение сторон
+        UIScale = Vector2.new(3, 4),
         Visible = false
     }
 }
@@ -54,7 +63,6 @@ local Themes = {
         Danger = Color3.fromRGB(244, 67, 54),
         Warning = Color3.fromRGB(255, 193, 7)
     },
-    -- Дополнительные темы
     Neon = {
         Background = Color3.fromRGB(10, 10, 20),
         BackgroundSecondary = Color3.fromRGB(20, 20, 35),
@@ -105,7 +113,6 @@ local function ApplyTheme(gui, theme)
     local themeData = Themes[theme]
     if not themeData then return end
     
-    -- Применяем тему ко всем элементам
     for _, element in pairs(gui:GetDescendants()) do
         if element:IsA("Frame") or element:IsA("ScrollingFrame") then
             if element.Name == "MainFrame" or element.Name == "TabFrame" then
@@ -177,7 +184,6 @@ function ModernUI:CreateUI(title, scale)
     MainFrame.Parent = ScreenGui
     MainFrame.Visible = false
     
-    -- Устанавливаем размеры в зависимости от соотношения
     local scaleRatio = scale or Vector2.new(3, 4)
     local aspectRatio = scaleRatio.X / scaleRatio.Y
     local viewportSize = workspace.CurrentCamera.ViewportSize
@@ -193,11 +199,9 @@ function ModernUI:CreateUI(title, scale)
     MainFrame.Size = UDim2.new(0, sizeX, 0, sizeY)
     MainFrame.Position = UDim2.new(0.5, -sizeX/2, 0.5, -sizeY/2)
     
-    -- Тень
     local Shadow = CreateShadow()
     Shadow.Parent = MainFrame
     
-    -- Заголовок GUI
     local TitleLabel = Instance.new("TextLabel")
     TitleLabel.Name = "Title"
     TitleLabel.Size = UDim2.new(1, -80, 0, 40)
@@ -210,7 +214,6 @@ function ModernUI:CreateUI(title, scale)
     TitleLabel.Font = Enum.Font.GothamSemibold
     TitleLabel.Parent = MainFrame
     
-    -- Кнопка закрытия
     local CloseButton = Instance.new("ImageButton")
     CloseButton.Name = "CloseButton"
     CloseButton.Size = UDim2.new(0, 30, 0, 30)
@@ -224,7 +227,6 @@ function ModernUI:CreateUI(title, scale)
         self:ToggleUI()
     end)
     
-    -- Разделитель
     local Divider = Instance.new("Frame")
     Divider.Size = UDim2.new(1, -20, 0, 1)
     Divider.Position = UDim2.new(0, 10, 0, 45)
@@ -232,7 +234,6 @@ function ModernUI:CreateUI(title, scale)
     Divider.BorderSizePixel = 0
     Divider.Parent = MainFrame
     
-    -- Контейнер для вкладок (левая панель)
     local TabContainer = Instance.new("ScrollingFrame")
     TabContainer.Name = "TabContainer"
     TabContainer.Size = UDim2.new(0, 120, 1, -55)
@@ -244,7 +245,6 @@ function ModernUI:CreateUI(title, scale)
     TabContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
     TabContainer.Parent = MainFrame
     
-    -- Контейнер для контента (правая панель)
     local ContentContainer = Instance.new("Frame")
     ContentContainer.Name = "ContentContainer"
     ContentContainer.Size = UDim2.new(1, -135, 1, -55)
@@ -252,21 +252,17 @@ function ModernUI:CreateUI(title, scale)
     ContentContainer.BackgroundTransparency = 1
     ContentContainer.Parent = MainFrame
     
-    -- Сохраняем ссылки
     UIStore.ScreenGui = ScreenGui
     UIStore.MainFrame = MainFrame
     UIStore.TabContainer = TabContainer
     UIStore.ContentContainer = ContentContainer
     UIStore.TitleLabel = TitleLabel
     
-    -- Создаем вкладку настроек по умолчанию
     local settingsTab = self:CreateTab("Настройки", "settings")
     UIStore.SettingsTab = settingsTab
     
-    -- Добавляем элементы настроек
     self:AddSettingsUI(settingsTab)
     
-    -- Настройка горячей клавиши
     UserInputService.InputBegan:Connect(function(input, processed)
         if processed then return end
         if input.KeyCode == UIStore.Settings.ToggleKey and input.UserInputType == Enum.UserInputType.Keyboard then
@@ -274,11 +270,9 @@ function ModernUI:CreateUI(title, scale)
         end
     end)
     
-    -- Сохраняем UI в сервис
     local DataStore = {}
     UIStore.DataStore = DataStore
     
-    -- Загружаем сохраненные настройки
     self:LoadSettings()
     
     return ScreenGui
@@ -288,7 +282,6 @@ end
 function ModernUI:CreateTab(name, id)
     local tabId = id or name:lower():gsub("%s+", "_")
     
-    -- Кнопка вкладки
     local TabButton = Instance.new("TextButton")
     TabButton.Name = "TabButton"
     TabButton.Size = UDim2.new(1, -10, 0, 35)
@@ -302,7 +295,6 @@ function ModernUI:CreateTab(name, id)
     TabButton.Parent = UIStore.TabContainer
     TabButton.AutoButtonColor = false
     
-    -- Ховер эффект
     TabButton.MouseEnter:Connect(function()
         if TabButton.Name ~= "TabButtonActive" then
             TweenService:Create(TabButton, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(50, 50, 55)}):Play()
@@ -315,7 +307,6 @@ function ModernUI:CreateTab(name, id)
         end
     end)
     
-    -- Контейнер для контента вкладки
     local TabContent = Instance.new("ScrollingFrame")
     TabContent.Name = "TabContent_" .. tabId
     TabContent.Size = UDim2.new(1, -20, 1, -10)
@@ -328,7 +319,6 @@ function ModernUI:CreateTab(name, id)
     TabContent.Parent = UIStore.ContentContainer
     TabContent.Visible = false
     
-    -- Автоматическое обновление CanvasSize
     local function updateCanvas()
         local maxY = 0
         for _, child in pairs(TabContent:GetChildren()) do
@@ -342,7 +332,6 @@ function ModernUI:CreateTab(name, id)
         TabContent.CanvasSize = UDim2.new(0, 0, 0, maxY + 10)
     end
     
-    -- Обновляем CanvasSize при изменении размера
     TabContent:GetPropertyChangedSignal("AbsoluteSize"):Connect(updateCanvas)
     
     local tabData = {
@@ -356,16 +345,13 @@ function ModernUI:CreateTab(name, id)
     
     table.insert(UIStore.Tabs, tabData)
     
-    -- Обновляем CanvasSize
     local totalHeight = #UIStore.Tabs * 40 + 15
     UIStore.TabContainer.CanvasSize = UDim2.new(0, 0, 0, totalHeight)
     
-    -- Если это первая вкладка, активируем её
     if #UIStore.Tabs == 1 then
         self:SelectTab(tabId)
     end
     
-    -- Возвращаем ID вкладки для добавления элементов
     return tabId
 end
 
@@ -398,7 +384,6 @@ function ModernUI:AddToggleWithBind(tabId, name, defaultValue, bindKey, callback
     container.BackgroundTransparency = 1
     container.Parent = tab.Content
     
-    -- Название
     local label = Instance.new("TextLabel")
     label.Name = "Label"
     label.Size = UDim2.new(0.6, 0, 1, 0)
@@ -411,7 +396,6 @@ function ModernUI:AddToggleWithBind(tabId, name, defaultValue, bindKey, callback
     label.Font = Enum.Font.Gotham
     label.Parent = container
     
-    -- Кнопка переключения
     local toggle = Instance.new("TextButton")
     toggle.Name = "ToggleButton"
     toggle.Size = UDim2.new(0, 100, 0, 35)
@@ -424,7 +408,6 @@ function ModernUI:AddToggleWithBind(tabId, name, defaultValue, bindKey, callback
     toggle.BorderSizePixel = 0
     toggle.Parent = container
     
-    -- Бинд клавиши
     local bindLabel = Instance.new("TextLabel")
     bindLabel.Size = UDim2.new(0, 80, 0, 25)
     bindLabel.Position = UDim2.new(1, -200, 0.5, -12.5)
@@ -439,7 +422,6 @@ function ModernUI:AddToggleWithBind(tabId, name, defaultValue, bindKey, callback
     local state = defaultValue or false
     local key = bindKey or Enum.KeyCode.LeftControl
     
-    -- Обновление состояния
     local function updateState(newState)
         state = newState
         if state then
@@ -458,7 +440,6 @@ function ModernUI:AddToggleWithBind(tabId, name, defaultValue, bindKey, callback
         updateState(not state)
     end)
     
-    -- Бинд клавиши
     local bindConnection
     if key then
         bindConnection = UserInputService.InputBegan:Connect(function(input, processed)
@@ -519,7 +500,6 @@ function ModernUI:AddButton(tabId, name, callback)
     button.BorderSizePixel = 0
     button.Parent = container
     
-    -- Ховер эффект
     button.MouseEnter:Connect(function()
         TweenService:Create(button, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(80, 150, 255)}):Play()
     end)
@@ -530,7 +510,6 @@ function ModernUI:AddButton(tabId, name, callback)
     
     button.MouseButton1Click:Connect(function()
         if callback then callback() end
-        -- Анимация нажатия
         TweenService:Create(button, TweenInfo.new(0.1), {BackgroundColor3 = Color3.fromRGB(50, 100, 200)}):Play()
         task.wait(0.1)
         TweenService:Create(button, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(64, 128, 255)}):Play()
@@ -557,7 +536,6 @@ function ModernUI:AddSlider(tabId, name, minValue, maxValue, defaultValue, callb
     container.BackgroundTransparency = 1
     container.Parent = tab.Content
     
-    -- Название
     local label = Instance.new("TextLabel")
     label.Name = "Label"
     label.Size = UDim2.new(0.6, 0, 0.4, 0)
@@ -570,7 +548,6 @@ function ModernUI:AddSlider(tabId, name, minValue, maxValue, defaultValue, callb
     label.Font = Enum.Font.Gotham
     label.Parent = container
     
-    -- Значение
     local valueLabel = Instance.new("TextLabel")
     valueLabel.Name = "ValueLabel"
     valueLabel.Size = UDim2.new(0.4, 0, 0.4, 0)
@@ -583,7 +560,6 @@ function ModernUI:AddSlider(tabId, name, minValue, maxValue, defaultValue, callb
     valueLabel.Font = Enum.Font.GothamBold
     valueLabel.Parent = container
     
-    -- Полоса
     local sliderBg = Instance.new("Frame")
     sliderBg.Name = "SliderBackground"
     sliderBg.Size = UDim2.new(1, 0, 0, 6)
@@ -612,7 +588,6 @@ function ModernUI:AddSlider(tabId, name, minValue, maxValue, defaultValue, callb
     local max = maxValue or 100
     local value = defaultValue or min
     
-    -- Обновление слайдера
     local function updateSlider(newValue)
         value = math.clamp(newValue, min, max)
         local percentage = (value - min) / (max - min)
@@ -623,7 +598,6 @@ function ModernUI:AddSlider(tabId, name, minValue, maxValue, defaultValue, callb
     
     updateSlider(value)
     
-    -- Drag функционал
     local dragging = false
     local dragConnection
     
@@ -679,7 +653,6 @@ function ModernUI:AddDropdown(tabId, name, options, allowMultiSelect, callback)
     container.ClipsDescendants = true
     container.Parent = tab.Content
     
-    -- Название
     local label = Instance.new("TextLabel")
     label.Name = "Label"
     label.Size = UDim2.new(0.5, 0, 0.4, 0)
@@ -692,7 +665,6 @@ function ModernUI:AddDropdown(tabId, name, options, allowMultiSelect, callback)
     label.Font = Enum.Font.Gotham
     label.Parent = container
     
-    -- Кнопка дропдауна
     local dropdownButton = Instance.new("TextButton")
     dropdownButton.Name = "Dropdown"
     dropdownButton.Size = UDim2.new(0.5, 0, 0.4, 0)
@@ -705,7 +677,6 @@ function ModernUI:AddDropdown(tabId, name, options, allowMultiSelect, callback)
     dropdownButton.BorderSizePixel = 0
     dropdownButton.Parent = container
     
-    -- Контейнер для списка
     local listContainer = Instance.new("Frame")
     listContainer.Size = UDim2.new(0.5, 0, 0, 0)
     listContainer.Position = UDim2.new(0.5, 0, 0.4, 5)
@@ -726,9 +697,7 @@ function ModernUI:AddDropdown(tabId, name, options, allowMultiSelect, callback)
     local selectedOptions = {}
     local isMulti = allowMultiSelect or false
     
-    -- Создание элементов списка
     local function updateList()
-        -- Очищаем список
         for _, child in pairs(listScrolling:GetChildren()) do
             if child:IsA("TextButton") then
                 child:Destroy()
@@ -750,7 +719,6 @@ function ModernUI:AddDropdown(tabId, name, options, allowMultiSelect, callback)
             item.BorderSizePixel = 0
             item.Parent = listScrolling
             
-            -- Ховер эффект
             item.MouseEnter:Connect(function()
                 if item.Name ~= "DropdownItemSelected" then
                     TweenService:Create(item, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(50, 50, 55)}):Play()
@@ -765,7 +733,6 @@ function ModernUI:AddDropdown(tabId, name, options, allowMultiSelect, callback)
             
             item.MouseButton1Click:Connect(function()
                 if isMulti then
-                    -- Множественный выбор
                     local index = table.find(selectedOptions, option)
                     if index then
                         table.remove(selectedOptions, index)
@@ -779,7 +746,6 @@ function ModernUI:AddDropdown(tabId, name, options, allowMultiSelect, callback)
                         item.TextColor3 = Color3.fromRGB(255, 255, 255)
                     end
                     
-                    -- Обновляем текст кнопки
                     if #selectedOptions > 0 then
                         dropdownButton.Text = table.concat(selectedOptions, ", ")
                     else
@@ -788,11 +754,9 @@ function ModernUI:AddDropdown(tabId, name, options, allowMultiSelect, callback)
                     
                     if callback then callback(selectedOptions) end
                 else
-                    -- Одиночный выбор
                     selectedOptions = {option}
                     dropdownButton.Text = option
                     
-                    -- Обновляем выделение
                     for _, child in pairs(listScrolling:GetChildren()) do
                         if child:IsA("TextButton") then
                             if child.Text == option then
@@ -818,7 +782,6 @@ function ModernUI:AddDropdown(tabId, name, options, allowMultiSelect, callback)
         listScrolling.CanvasSize = UDim2.new(0, 0, 0, #options * 30)
     end
     
-    -- Переключение видимости списка
     local dropdownOpen = false
     local function toggleDropdown(open)
         dropdownOpen = (open == nil) and not dropdownOpen or open
@@ -835,7 +798,6 @@ function ModernUI:AddDropdown(tabId, name, options, allowMultiSelect, callback)
         updateList()
     end)
     
-    -- Закрытие при клике вне
     UserInputService.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
             if dropdownOpen then
@@ -911,14 +873,12 @@ function ModernUI:AddSettingsUI(tabId)
     local tab = self:FindTab(tabId)
     if not tab then return end
     
-    -- Выбор темы
     local themeDropdown = self:AddDropdown(tabId, "Тема", {"Dark", "Light", "Neon", "Pastel"}, false, function(value)
         UIStore.Settings.Theme = value
         self:ApplyTheme(value)
         self:SaveSettings()
     end)
     
-    -- Выбор клавиши
     local keyOptions = {}
     for _, key in pairs(Enum.KeyCode:GetEnumItems()) do
         table.insert(keyOptions, tostring(key))
@@ -934,15 +894,13 @@ function ModernUI:AddSettingsUI(tabId)
         end
     end)
     
-    -- Размер UI
     local sizeDropdown = self:AddDropdown(tabId, "Размер UI", {"3:4", "1:1", "1:2", "2:3", "1:3"}, false, function(value)
-        local parts = value:split(":")
+        local parts = splitString(value, ":")
         UIStore.Settings.UIScale = Vector2.new(tonumber(parts[1]), tonumber(parts[2]))
         self:ResizeUI()
         self:SaveSettings()
     end)
     
-    -- Устанавливаем текущие значения
     themeDropdown:SetSelected({UIStore.Settings.Theme})
     keyDropdown:SetSelected({tostring(UIStore.Settings.ToggleKey)})
     local scaleStr = tostring(UIStore.Settings.UIScale.X) .. ":" .. tostring(UIStore.Settings.UIScale.Y)
