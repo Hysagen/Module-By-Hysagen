@@ -1,6 +1,6 @@
 --[[
     ModernUI Module - Полностью кастомизируемый интерфейс для скриптов
-    Версия: 1.0.3 (Исправлена ошибка clamp)
+    Версия: 1.0.4 (Полностью исправлена ошибка clamp)
     Автор: AI Assistant
 ]]
 
@@ -99,7 +99,7 @@ local Themes = {
 }
 
 -- Вспомогательные функции для UI
-local function CreateShadow(properties)
+local function CreateShadow()
     local shadow = Instance.new("ImageLabel")
     shadow.Image = "rbxassetid://1316043044"
     shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
@@ -129,9 +129,7 @@ local function ApplyTheme(gui, theme)
             elseif element.Name == "Button" then
                 element.BackgroundColor3 = themeData.Accent
                 element.TextColor3 = themeData.Text
-            elseif element.Name == "ButtonHover" then
-                element.BackgroundColor3 = themeData.AccentHover
-            elseif element.Name == "Slider" or element.Name == "SliderBackground" then
+            elseif element.Name == "SliderBackground" then
                 element.BackgroundColor3 = themeData.BackgroundTertiary
             elseif element.Name == "SliderFill" then
                 element.BackgroundColor3 = themeData.Accent
@@ -144,9 +142,7 @@ local function ApplyTheme(gui, theme)
             elseif element.Name == "DropdownItemSelected" then
                 element.BackgroundColor3 = themeData.Accent
                 element.TextColor3 = themeData.Text
-            elseif element.Name == "SettingsPanel" then
-                element.BackgroundColor3 = themeData.BackgroundSecondary
-            elseif element.Name == "Title" or element.Name == "TabTitle" then
+            elseif element.Name == "Title" then
                 element.TextColor3 = themeData.Text
             elseif element.Name == "Label" then
                 element.TextColor3 = themeData.TextSecondary
@@ -155,13 +151,8 @@ local function ApplyTheme(gui, theme)
             elseif element.Name == "ToggleButton" then
                 element.BackgroundColor3 = themeData.BackgroundTertiary
                 element.TextColor3 = themeData.Text
-            elseif element.Name == "ToggleActive" then
-                element.BackgroundColor3 = themeData.Accent
-                element.TextColor3 = themeData.Text
-            elseif element.Name == "ScrollBar" then
-                element.BackgroundColor3 = themeData.Accent
             end
-        elseif element:IsA("TextLabel") and element.Name ~= "Title" and element.Name ~= "TabTitle" and element.Name ~= "Label" and element.Name ~= "ValueLabel" then
+        elseif element:IsA("TextLabel") and element.Name ~= "Title" and element.Name ~= "Label" and element.Name ~= "ValueLabel" then
             element.TextColor3 = themeData.Text
         elseif element:IsA("ImageButton") then
             if element.Name == "CloseButton" then
@@ -591,14 +582,23 @@ function ModernUI:AddSlider(tabId, name, minValue, maxValue, defaultValue, callb
     local max = maxValue or 100
     local value = defaultValue or min
     
+    -- Обновление слайдера с защитой от неправильных данных
     local function updateSlider(newValue)
-        -- Защита от передачи таблицы или другого нечислового значения
+        -- Преобразуем в число, если это таблица
         if type(newValue) == "table" then
             newValue = newValue[1] or 0
         end
-        newValue = tonumber(newValue) or 0
+        -- Преобразуем в число
+        newValue = tonumber(newValue)
+        if not newValue then
+            newValue = 0
+        end
         
-        value = math.clamp(newValue, min, max)
+        -- Ограничиваем значение
+        if newValue < min then newValue = min end
+        if newValue > max then newValue = max end
+        
+        value = newValue
         local percentage = (value - min) / (max - min)
         sliderFill.Size = UDim2.new(percentage, 0, 1, 0)
         valueLabel.Text = tostring(math.round(value * 100) / 100)
@@ -620,7 +620,9 @@ function ModernUI:AddSlider(tabId, name, minValue, maxValue, defaultValue, callb
             end
             
             local mousePos = UserInputService:GetMouseLocation().X
-            local offset = math.clamp((mousePos - sliderBg.AbsolutePosition.X) / sliderBg.AbsoluteSize.X, 0, 1)
+            local offset = (mousePos - sliderBg.AbsolutePosition.X) / sliderBg.AbsoluteSize.X
+            if offset < 0 then offset = 0 end
+            if offset > 1 then offset = 1 end
             local newValue = min + (max - min) * offset
             updateSlider(newValue)
         end)
@@ -633,10 +635,12 @@ function ModernUI:AddSlider(tabId, name, minValue, maxValue, defaultValue, callb
         end
     end)
     
-    -- Также обрабатываем клик по фону слайдера
+    -- Клик по фону слайдера
     sliderBg.MouseButton1Click:Connect(function()
         local mousePos = UserInputService:GetMouseLocation().X
-        local offset = math.clamp((mousePos - sliderBg.AbsolutePosition.X) / sliderBg.AbsoluteSize.X, 0, 1)
+        local offset = (mousePos - sliderBg.AbsolutePosition.X) / sliderBg.AbsoluteSize.X
+        if offset < 0 then offset = 0 end
+        if offset > 1 then offset = 1 end
         local newValue = min + (max - min) * offset
         updateSlider(newValue)
     end)
