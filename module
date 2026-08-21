@@ -1,79 +1,102 @@
---[[
-	UIModule.lua
-	Модуль для создания кастомизируемого UI для скриптов в Roblox.
-	Включает вкладки, кнопки-тогглы (с биндом и без), слайдеры, дропдауны,
-	настройки темы и горячей клавиши, адаптивный размер.
-	
-	Использование:
-		local UI = require(script.Parent.UIModule)
-		local myUI = UI.new({
-			title = "My Script",
-			ratio = "3:4",          -- соотношение ширины к высоте
-			theme = "dark",         -- "light" или "dark"
-			toggleKey = Enum.KeyCode.F1
-		})
-		local tab = myUI:addTab("Main")
-		local toggle = tab:addToggle("Enable", {bindKey = Enum.KeyCode.F, default = false})
-		toggle.onChanged:Connect(function(value) print("Toggle changed:", value) end)
-		
-		local slider = tab:addSlider("Speed", {min = 0, max = 100, default = 50})
-		slider.onChanged:Connect(function(value) print("Speed:", value) end)
-		
-		local dropdown = tab:addDropdown("Mode", {
-			options = {"Easy", "Normal", "Hard"},
-			mode = "single",   -- или "multiple"
-			default = "Normal"
-		})
-		dropdown.onChanged:Connect(function(value) print("Mode:", value) end)
-		
-		-- Доступ к настройкам
-		myUI:setTheme("light")
-		myUI:setToggleKey(Enum.KeyCode.RightShift)
-		
-		-- Показать/скрыть
-		myUI:show()
-		myUI:hide()
-		myUI:toggle()
-		
-		-- Сохранение темы (пользователь реализует сохранение)
-		myUI.onThemeChanged:Connect(function(theme)
-			-- сохранить тему, например в DataStore
-		end)
---]]
+-- [[
+--   UI Module для Roblox
+--   Версия 1.0
+--   Загружается через loadstring
+--   Предоставляет удобный и кастомизируемый интерфейс
+-- ]]
 
 local UIModule = {}
-UIModule.__index = UIModule
 
--- Вспомогательные функции
-local function parseRatio(ratioStr)
-	local w, h = ratioStr:match("(%d+):(%d+)")
-	if not w then return 0.75 end
-	return tonumber(w) / tonumber(h)
-end
+-- Служебные сервисы
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
-local function createRoundedFrame(parent, size, position, background, transparency)
+-- Предопределённые темы
+local THEMES = {
+	Dark = {
+		Background = Color3.fromRGB(30, 30, 30),
+		BackgroundSecondary = Color3.fromRGB(45, 45, 45),
+		BackgroundAccent = Color3.fromRGB(60, 60, 60),
+		Text = Color3.fromRGB(255, 255, 255),
+		TextSecondary = Color3.fromRGB(200, 200, 200),
+		Border = Color3.fromRGB(70, 70, 70),
+		Accent = Color3.fromRGB(66, 133, 244),
+		AccentHover = Color3.fromRGB(50, 120, 230),
+		AccentPressed = Color3.fromRGB(30, 100, 210),
+		ToggleOn = Color3.fromRGB(76, 175, 80),
+		ToggleOff = Color3.fromRGB(200, 200, 200),
+		SliderTrack = Color3.fromRGB(80, 80, 80),
+		SliderFill = Color3.fromRGB(66, 133, 244),
+		ScrollBar = Color3.fromRGB(100, 100, 100),
+	},
+	Light = {
+		Background = Color3.fromRGB(240, 240, 240),
+		BackgroundSecondary = Color3.fromRGB(220, 220, 220),
+		BackgroundAccent = Color3.fromRGB(200, 200, 200),
+		Text = Color3.fromRGB(30, 30, 30),
+		TextSecondary = Color3.fromRGB(80, 80, 80),
+		Border = Color3.fromRGB(180, 180, 180),
+		Accent = Color3.fromRGB(30, 130, 230),
+		AccentHover = Color3.fromRGB(20, 110, 210),
+		AccentPressed = Color3.fromRGB(10, 90, 190),
+		ToggleOn = Color3.fromRGB(76, 175, 80),
+		ToggleOff = Color3.fromRGB(180, 180, 180),
+		SliderTrack = Color3.fromRGB(200, 200, 200),
+		SliderFill = Color3.fromRGB(30, 130, 230),
+		ScrollBar = Color3.fromRGB(160, 160, 160),
+	},
+	Blue = {
+		Background = Color3.fromRGB(20, 30, 50),
+		BackgroundSecondary = Color3.fromRGB(35, 50, 75),
+		BackgroundAccent = Color3.fromRGB(50, 70, 100),
+		Text = Color3.fromRGB(240, 245, 255),
+		TextSecondary = Color3.fromRGB(190, 200, 220),
+		Border = Color3.fromRGB(60, 80, 110),
+		Accent = Color3.fromRGB(100, 180, 255),
+		AccentHover = Color3.fromRGB(70, 160, 240),
+		AccentPressed = Color3.fromRGB(40, 140, 220),
+		ToggleOn = Color3.fromRGB(100, 200, 100),
+		ToggleOff = Color3.fromRGB(150, 150, 170),
+		SliderTrack = Color3.fromRGB(60, 80, 110),
+		SliderFill = Color3.fromRGB(100, 180, 255),
+		ScrollBar = Color3.fromRGB(80, 100, 130),
+	},
+}
+
+-- Функция для создания GUI элемента с единым стилем
+local function createStyledFrame(parent, size, position, bgColor, borderColor, cornerRadius)
 	local frame = Instance.new("Frame")
 	frame.Size = size
 	frame.Position = position
-	frame.BackgroundColor3 = background
-	frame.BackgroundTransparency = transparency or 0
+	frame.BackgroundColor3 = bgColor
+	frame.BorderSizePixel = 0
+	if borderColor then
+		local stroke = Instance.new("UIStroke")
+		stroke.Color = borderColor
+		stroke.Thickness = 1
+		stroke.Parent = frame
+	end
+	if cornerRadius then
+		local corners = Instance.new("UICorner")
+		corners.CornerRadius = UDim.new(0, cornerRadius)
+		corners.Parent = frame
+	end
 	frame.Parent = parent
-	
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 8)
-	corner.Parent = frame
-	
 	return frame
 end
 
-local function createTextLabel(parent, text, size, position, color, font, textSize, transparency)
+local function createStyledTextLabel(parent, text, size, position, textColor, font, textSize)
 	local label = Instance.new("TextLabel")
-	label.Text = text
 	label.Size = size
 	label.Position = position
 	label.BackgroundTransparency = 1
-	label.TextColor3 = color
-	label.Font = font or Enum.Font.Gotham
+	label.Text = text
+	label.TextColor3 = textColor
+	label.Font = font or Enum.Font.GothamMedium
 	label.TextSize = textSize or 16
 	label.TextXAlignment = Enum.TextXAlignment.Left
 	label.TextYAlignment = Enum.TextYAlignment.Center
@@ -81,907 +104,948 @@ local function createTextLabel(parent, text, size, position, color, font, textSi
 	return label
 end
 
--- Класс элемента UI (базовый)
-local Element = {}
-Element.__index = Element
+local function createStyledButton(parent, text, size, position, bgColor, textColor, cornerRadius, callback)
+	local button = Instance.new("TextButton")
+	button.Size = size
+	button.Position = position
+	button.BackgroundColor3 = bgColor
+	button.Text = text
+	button.TextColor3 = textColor
+	button.TextSize = 14
+	button.Font = Enum.Font.GothamMedium
+	button.BorderSizePixel = 0
+	button.AutoButtonColor = false
 
-function Element.new(ui, tab, name, params)
-	local self = setmetatable({}, Element)
-	self.ui = ui
-	self.tab = tab
-	self.name = name
-	self.params = params or {}
-	self.onChanged = Instance.new("BindableEvent")
-	self.value = nil
-	self.guiObjects = {} -- храним все созданные гуи объекты
-	self:create()
-	return self
-end
+	local corners = Instance.new("UICorner")
+	corners.CornerRadius = UDim.new(0, cornerRadius or 6)
+	corners.Parent = button
 
-function Element:create() end
-function Element:getValue() return self.value end
-function Element:setValue(val) self.value = val; self:updateGUI(); self.onChanged:Fire(val) end
-function Element:updateGUI() end
-function Element:applyTheme(theme) end
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = Color3.fromRGB(80, 80, 80)
+	stroke.Thickness = 1
+	stroke.Parent = button
 
--- Класс Toggle (с биндом или без)
-local Toggle = setmetatable({}, {__index = Element})
-Toggle.__index = Toggle
+	button.MouseButton1Click:Connect(callback)
+	button.Parent = parent
 
-function Toggle.new(ui, tab, name, params)
-	local self = setmetatable(Element.new(ui, tab, name, params), Toggle)
-	return self
-end
-
-function Toggle:create()
-	local tabFrame = self.tab.contentFrame
-	local y = self.tab:getNextY()
-	
-	local container = createRoundedFrame(tabFrame, UDim2.new(1, -20, 0, 40), UDim2.new(0, 10, 0, y), self.ui.themeColors.buttonBg, 0)
-	container.Parent = tabFrame
-	
-	local label = createTextLabel(container, self.name, UDim2.new(0.7, -10, 1, 0), UDim2.new(0, 10, 0, 0), self.ui.themeColors.text, Enum.Font.Gotham, 16)
-	
-	local toggleBtn = Instance.new("TextButton")
-	toggleBtn.Size = UDim2.new(0, 80, 0, 30)
-	toggleBtn.Position = UDim2.new(1, -90, 0.5, -15)
-	toggleBtn.BackgroundColor3 = self.ui.themeColors.toggleOff
-	toggleBtn.Text = "OFF"
-	toggleBtn.TextColor3 = self.ui.themeColors.text
-	toggleBtn.Font = Enum.Font.Gotham
-	toggleBtn.TextSize = 14
-	toggleBtn.AutoButtonColor = false
-	toggleBtn.Parent = container
-	
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(1, 0)
-	corner.Parent = toggleBtn
-	
-	local bindLabel = nil
-	if self.params.bindKey then
-		local keyName = self.params.bindKey.Name
-		bindLabel = createTextLabel(container, "["..keyName.."]", UDim2.new(0, 80, 0, 20), UDim2.new(0, 100, 0.5, -10), self.ui.themeColors.textDim, Enum.Font.Gotham, 12)
-		bindLabel.TextXAlignment = Enum.TextXAlignment.Left
-		bindLabel.Parent = container
-	end
-	
-	self.guiObjects.container = container
-	self.guiObjects.toggleBtn = toggleBtn
-	self.guiObjects.bindLabel = bindLabel
-	
-	-- значение по умолчанию
-	local default = self.params.default or false
-	self:setValue(default)
-	
-	-- обработчик клика
-	toggleBtn.MouseButton1Click:Connect(function()
-		self:setValue(not self.value)
+	-- Эффект наведения
+	button.MouseEnter:Connect(function()
+		TweenService:Create(button, TweenInfo.new(0.15), {BackgroundColor3 = bgColor:Lerp(Color3.new(1,1,1), 0.1)}):Play()
 	end)
-	
-	-- обработчик бинда
-	if self.params.bindKey then
-		local inputService = game:GetService("UserInputService")
-		local bindFunc = function(input, processed)
-			if processed then return end
-			if input.KeyCode == self.params.bindKey and input.UserInputType == Enum.UserInputType.Keyboard then
-				self:setValue(not self.value)
-			end
-		end
-		inputService.InputBegan:Connect(bindFunc)
-		self.bindFunc = bindFunc
-	end
-end
-
-function Toggle:updateGUI()
-	local btn = self.guiObjects.toggleBtn
-	if self.value then
-		btn.BackgroundColor3 = self.ui.themeColors.toggleOn
-		btn.Text = "ON"
-	else
-		btn.BackgroundColor3 = self.ui.themeColors.toggleOff
-		btn.Text = "OFF"
-	end
-end
-
-function Toggle:applyTheme(theme)
-	local container = self.guiObjects.container
-	container.BackgroundColor3 = theme.buttonBg
-	local btn = self.guiObjects.toggleBtn
-	btn.BackgroundColor3 = self.value and theme.toggleOn or theme.toggleOff
-	btn.TextColor3 = theme.text
-	if self.guiObjects.bindLabel then
-		self.guiObjects.bindLabel.TextColor3 = theme.textDim
-	end
-	-- обновляем текст лейбла (он уже есть, но цвет)
-	local label = container:FindFirstChildOfClass("TextLabel")
-	if label then
-		label.TextColor3 = theme.text
-	end
-end
-
--- Класс Slider
-local Slider = setmetatable({}, {__index = Element})
-Slider.__index = Slider
-
-function Slider.new(ui, tab, name, params)
-	local self = setmetatable(Element.new(ui, tab, name, params), Slider)
-	return self
-end
-
-function Slider:create()
-	local tabFrame = self.tab.contentFrame
-	local y = self.tab:getNextY()
-	
-	local container = createRoundedFrame(tabFrame, UDim2.new(1, -20, 0, 50), UDim2.new(0, 10, 0, y), self.ui.themeColors.buttonBg, 0)
-	container.Parent = tabFrame
-	
-	local label = createTextLabel(container, self.name, UDim2.new(0.4, -10, 1, 0), UDim2.new(0, 10, 0, 0), self.ui.themeColors.text, Enum.Font.Gotham, 16)
-	
-	local valueLabel = createTextLabel(container, "0", UDim2.new(0.4, -10, 1, 0), UDim2.new(0.6, 0, 0, 0), self.ui.themeColors.text, Enum.Font.Gotham, 14)
-	valueLabel.TextXAlignment = Enum.TextXAlignment.Right
-	valueLabel.Parent = container
-	
-	-- ползунок
-	local sliderFrame = Instance.new("Frame")
-	sliderFrame.Size = UDim2.new(0.4, -10, 0, 6)
-	sliderFrame.Position = UDim2.new(0.6, 0, 0.5, -3)
-	sliderFrame.BackgroundColor3 = self.ui.themeColors.sliderBg
-	sliderFrame.Parent = container
-	local cornerSlider = Instance.new("UICorner")
-	cornerSlider.CornerRadius = UDim.new(1, 0)
-	cornerSlider.Parent = sliderFrame
-	
-	local fill = Instance.new("Frame")
-	fill.Size = UDim2.new(0.5, 0, 1, 0)
-	fill.BackgroundColor3 = self.ui.themeColors.sliderFill
-	fill.Parent = sliderFrame
-	local cornerFill = Instance.new("UICorner")
-	cornerFill.CornerRadius = UDim.new(1, 0)
-	cornerFill.Parent = fill
-	
-	-- кнопка-ползунок
-	local grabber = Instance.new("TextButton")
-	grabber.Size = UDim2.new(0, 16, 0, 16)
-	grabber.Position = UDim2.new(0.5, -8, 0.5, -8)
-	grabber.BackgroundColor3 = self.ui.themeColors.grabber
-	grabber.Text = ""
-	grabber.Parent = sliderFrame
-	local cornerGrab = Instance.new("UICorner")
-	cornerGrab.CornerRadius = UDim.new(1, 0)
-	cornerGrab.Parent = grabber
-	
-	self.guiObjects.container = container
-	self.guiObjects.valueLabel = valueLabel
-	self.guiObjects.fill = fill
-	self.guiObjects.grabber = grabber
-	self.guiObjects.sliderFrame = sliderFrame
-	
-	self.min = self.params.min or 0
-	self.max = self.params.max or 100
-	local default = self.params.default or (self.min + self.max) / 2
-	self:setValue(default)
-	
-	-- Drag логика
-	local dragging = false
-	local function updateSlider(input)
-		local posX = input.Position.X - sliderFrame.AbsolutePosition.X
-		local width = sliderFrame.AbsoluteSize.X
-		local ratio = math.clamp(posX / width, 0, 1)
-		local val = self.min + (self.max - self.min) * ratio
-		self:setValue(val)
-	end
-	
-	grabber.MouseButton1Down:Connect(function()
-		dragging = true
+	button.MouseLeave:Connect(function()
+		TweenService:Create(button, TweenInfo.new(0.15), {BackgroundColor3 = bgColor}):Play()
 	end)
-	
-	game:GetService("UserInputService").InputChanged:Connect(function(input, processed)
-		if processed then return end
-		if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-			updateSlider(input)
-		end
-	end)
-	
-	game:GetService("UserInputService").InputEnded:Connect(function(input, processed)
-		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			dragging = false
-		end
-	end)
-	
-	-- также клик на трек
-	sliderFrame.MouseButton1Click:Connect(function(input)
-		updateSlider(input)
-	end)
+
+	return button
 end
 
-function Slider:updateGUI()
-	local ratio = (self.value - self.min) / (self.max - self.min)
-	self.guiObjects.fill.Size = UDim2.new(ratio, 0, 1, 0)
-	self.guiObjects.grabber.Position = UDim2.new(ratio, -8, 0.5, -8)
-	self.guiObjects.valueLabel.Text = string.format("%.1f", self.value)
-end
-
-function Slider:applyTheme(theme)
-	local container = self.guiObjects.container
-	container.BackgroundColor3 = theme.buttonBg
-	self.guiObjects.valueLabel.TextColor3 = theme.text
-	self.guiObjects.sliderFrame.BackgroundColor3 = theme.sliderBg
-	self.guiObjects.fill.BackgroundColor3 = theme.sliderFill
-	self.guiObjects.grabber.BackgroundColor3 = theme.grabber
-	local label = container:FindFirstChildOfClass("TextLabel")
-	if label then
-		label.TextColor3 = theme.text
-	end
-end
-
--- Класс Dropdown
-local Dropdown = setmetatable({}, {__index = Element})
-Dropdown.__index = Dropdown
-
-function Dropdown.new(ui, tab, name, params)
-	local self = setmetatable(Element.new(ui, tab, name, params), Dropdown)
-	self.options = params.options or {}
-	self.mode = params.mode or "single" -- "single" или "multiple"
-	self.selected = {}
-	if self.mode == "single" then
-		local default = params.default or self.options[1]
-		if default then self.selected[default] = true end
-	else
-		local defaults = params.default or {}
-		if type(defaults) == "table" then
-			for _, opt in ipairs(defaults) do
-				self.selected[opt] = true
-			end
-		else
-			self.selected[defaults] = true
-		end
-	end
-	return self
-end
-
-function Dropdown:create()
-	local tabFrame = self.tab.contentFrame
-	local y = self.tab:getNextY()
-	
-	local container = createRoundedFrame(tabFrame, UDim2.new(1, -20, 0, 40), UDim2.new(0, 10, 0, y), self.ui.themeColors.buttonBg, 0)
-	container.Parent = tabFrame
-	
-	local label = createTextLabel(container, self.name, UDim2.new(0.5, -10, 1, 0), UDim2.new(0, 10, 0, 0), self.ui.themeColors.text, Enum.Font.Gotham, 16)
-	
-	local btn = Instance.new("TextButton")
-	btn.Size = UDim2.new(0.4, -10, 0, 30)
-	btn.Position = UDim2.new(0.6, 0, 0.5, -15)
-	btn.BackgroundColor3 = self.ui.themeColors.buttonBg
-	btn.Text = self:getDisplayText()
-	btn.TextColor3 = self.ui.themeColors.text
-	btn.Font = Enum.Font.Gotham
-	btn.TextSize = 14
-	btn.Parent = container
-	local cornerBtn = Instance.new("UICorner")
-	cornerBtn.CornerRadius = UDim.new(0, 4)
-	cornerBtn.Parent = btn
-	
-	-- выпадающий список
-	local dropdownFrame = Instance.new("Frame")
-	dropdownFrame.Size = UDim2.new(0.4, -10, 0, 100)
-	dropdownFrame.Position = UDim2.new(0.6, 0, 1, 5)
-	dropdownFrame.BackgroundColor3 = self.ui.themeColors.buttonBg
-	dropdownFrame.Visible = false
-	dropdownFrame.ZIndex = 10
-	dropdownFrame.Parent = container
-	local cornerDrop = Instance.new("UICorner")
-	cornerDrop.CornerRadius = UDim.new(0, 4)
-	cornerDrop.Parent = dropdownFrame
-	-- тень
-	local shadow = Instance.new("UIShadow")
-	shadow.Size = 5
-	shadow.Parent = dropdownFrame
-	
-	local scroll = Instance.new("ScrollingFrame")
-	scroll.Size = UDim2.new(1, 0, 1, 0)
-	scroll.BackgroundTransparency = 1
-	scroll.BorderSizePixel = 0
-	scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-	scroll.ScrollBarThickness = 6
-	scroll.Parent = dropdownFrame
-	
-	local list = Instance.new("UIListLayout")
-	list.Padding = UDim.new(0, 2)
-	list.SortOrder = Enum.SortOrder.LayoutOrder
-	list.Parent = scroll
-	
-	self.guiObjects.container = container
-	self.guiObjects.btn = btn
-	self.guiObjects.dropdownFrame = dropdownFrame
-	self.guiObjects.scroll = scroll
-	self.guiObjects.list = list
-	self.guiObjects.optionButtons = {}
-	
-	-- заполнение опций
-	self:refreshOptions()
-	
-	-- клик по кнопке для открытия/закрытия
-	btn.MouseButton1Click:Connect(function()
-		dropdownFrame.Visible = not dropdownFrame.Visible
-	end)
-	
-	-- закрытие при клике вне
-	-- упрощённо: при клике на любую другую кнопку закрывать? сложно, оставим так.
-end
-
-function Dropdown:refreshOptions()
-	local scroll = self.guiObjects.scroll
-	-- очистить старые
-	for _, child in ipairs(scroll:GetChildren()) do
-		if child:IsA("TextButton") then child:Destroy() end
-	end
-	self.guiObjects.optionButtons = {}
-	
-	local options = self.options
-	local selected = self.selected
-	local mode = self.mode
-	
-	local ySize = 0
-	for i, opt in ipairs(options) do
-		local btn = Instance.new("TextButton")
-		btn.Size = UDim2.new(1, -10, 0, 30)
-		btn.BackgroundColor3 = self.ui.themeColors.buttonBg
-		btn.Text = opt
-		btn.TextColor3 = self.ui.themeColors.text
-		btn.Font = Enum.Font.Gotham
-		btn.TextSize = 14
-		btn.AutoButtonColor = false
-		btn.Parent = scroll
-		local corner = Instance.new("UICorner")
-		corner.CornerRadius = UDim.new(0, 2)
-		corner.Parent = btn
-		
-		-- индикатор выбора
-		local check = Instance.new("TextLabel")
-		check.Size = UDim2.new(0, 20, 1, 0)
-		check.Position = UDim2.new(1, -25, 0, 0)
-		check.BackgroundTransparency = 1
-		check.Text = (selected[opt]) and "✓" or ""
-		check.TextColor3 = self.ui.themeColors.text
-		check.Font = Enum.Font.Gotham
-		check.TextSize = 18
-		check.TextXAlignment = Enum.TextXAlignment.Center
-		check.Parent = btn
-		
-		btn.MouseButton1Click:Connect(function()
-			if mode == "single" then
-				-- сбросить все
-				for k in pairs(selected) do selected[k] = nil end
-				selected[opt] = true
-			else
-				selected[opt] = not selected[opt]
-			end
-			self:refreshOptions()
-			self.guiObjects.btn.Text = self:getDisplayText()
-			self.onChanged:Fire(self:getValue())
-		end)
-		
-		self.guiObjects.optionButtons[opt] = btn
-		ySize = ySize + 32
-	end
-	scroll.CanvasSize = UDim2.new(0, 0, 0, ySize)
-end
-
-function Dropdown:getDisplayText()
-	local selected = self.selected
-	local options = self.options
-	local texts = {}
-	for _, opt in ipairs(options) do
-		if selected[opt] then
-			table.insert(texts, opt)
-		end
-	end
-	if #texts == 0 then return "Выберите" end
-	return table.concat(texts, ", ")
-end
-
-function Dropdown:getValue()
-	local result = {}
-	for opt, sel in pairs(self.selected) do
-		if sel then table.insert(result, opt) end
-	end
-	if self.mode == "single" then
-		return result[1] or nil
-	end
-	return result
-end
-
-function Dropdown:applyTheme(theme)
-	local container = self.guiObjects.container
-	container.BackgroundColor3 = theme.buttonBg
-	self.guiObjects.btn.BackgroundColor3 = theme.buttonBg
-	self.guiObjects.btn.TextColor3 = theme.text
-	if self.guiObjects.dropdownFrame then
-		self.guiObjects.dropdownFrame.BackgroundColor3 = theme.buttonBg
-	end
-	local label = container:FindFirstChildOfClass("TextLabel")
-	if label then
-		label.TextColor3 = theme.text
-	end
-	-- обновить опции (цвета)
-	for _, btn in pairs(self.guiObjects.optionButtons) do
-		btn.BackgroundColor3 = theme.buttonBg
-		btn.TextColor3 = theme.text
-		local check = btn:FindFirstChildOfClass("TextLabel")
-		if check then
-			check.TextColor3 = theme.text
-		end
-	end
-end
-
--- Класс Tab
-local Tab = {}
-Tab.__index = Tab
-
-function Tab.new(ui, name)
-	local self = setmetatable({}, Tab)
-	self.ui = ui
-	self.name = name
-	self.elements = {}
-	self.yOffset = 10 -- для вертикального расположения элементов
-	
-	-- создаем GUI для вкладки: кнопка в левой панели и фрейм для содержимого
-	self:createGUI()
-	return self
-end
-
-function Tab:createGUI()
-	local ui = self.ui
-	local leftPanel = ui.leftPanel
-	local rightPanel = ui.rightPanel
-	
-	-- кнопка вкладки слева
-	local btn = Instance.new("TextButton")
-	btn.Size = UDim2.new(1, -10, 0, 35)
-	btn.Position = UDim2.new(0, 5, 0, 0)
-	btn.BackgroundColor3 = ui.themeColors.buttonBg
-	btn.Text = self.name
-	btn.TextColor3 = ui.themeColors.text
-	btn.Font = Enum.Font.Gotham
-	btn.TextSize = 16
-	btn.TextXAlignment = Enum.TextXAlignment.Left
-	btn.TextTruncate = Enum.TextTruncate.AtEnd
-	btn.AutoButtonColor = false
-	btn.Parent = leftPanel
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 4)
-	corner.Parent = btn
-	
-	-- фрейм содержимого (изначально невидим)
-	local content = Instance.new("Frame")
-	content.Size = UDim2.new(1, 0, 1, 0)
-	content.BackgroundTransparency = 1
-	content.Visible = false
-	content.Parent = rightPanel
-	
-	-- ScrollingFrame для элементов внутри содержимого
-	local scroll = Instance.new("ScrollingFrame")
-	scroll.Size = UDim2.new(1, 0, 1, 0)
-	scroll.BackgroundTransparency = 1
-	scroll.BorderSizePixel = 0
-	scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-	scroll.ScrollBarThickness = 6
-	scroll.Parent = content
-	
-	local list = Instance.new("UIListLayout")
-	list.Padding = UDim.new(0, 5)
-	list.SortOrder = Enum.SortOrder.LayoutOrder
-	list.Parent = scroll
-	
-	self.guiBtn = btn
-	self.contentFrame = content
-	self.scrollFrame = scroll
-	self.listLayout = list
-	
-	-- обработчик клика для переключения вкладки
-	btn.MouseButton1Click:Connect(function()
-		ui:selectTab(self)
-	end)
-end
-
-function Tab:getNextY()
-	-- возвращает Y для следующего элемента (используется для абсолютного позиционирования)
-	-- мы используем UIListLayout, поэтому просто возвращаем 0, но для совместимости оставим
-	return 0
-end
-
-function Tab:addToggle(name, params)
-	local toggle = Toggle.new(self.ui, self, name, params)
-	table.insert(self.elements, toggle)
-	return toggle
-end
-
-function Tab:addSlider(name, params)
-	local slider = Slider.new(self.ui, self, name, params)
-	table.insert(self.elements, slider)
-	return slider
-end
-
-function Tab:addDropdown(name, params)
-	local dropdown = Dropdown.new(self.ui, self, name, params)
-	table.insert(self.elements, dropdown)
-	return dropdown
-end
-
-function Tab:applyTheme(theme)
-	self.guiBtn.BackgroundColor3 = theme.buttonBg
-	self.guiBtn.TextColor3 = theme.text
-	for _, elem in ipairs(self.elements) do
-		elem:applyTheme(theme)
-	end
-end
-
-function Tab:show()
-	self.contentFrame.Visible = true
-end
-
-function Tab:hide()
-	self.contentFrame.Visible = false
-end
-
--- Основной класс UI
+-- Главный конструктор UI
 function UIModule.new(config)
-	local self = setmetatable({}, UIModule)
 	config = config or {}
-	self.title = config.title or "UI"
-	self.ratioStr = config.ratio or "3:4"
-	self.ratio = parseRatio(self.ratioStr)
-	self.theme = config.theme or "light"
-	self.toggleKey = config.toggleKey or Enum.KeyCode.RightShift
-	self.tabs = {}
-	self.currentTab = nil
-	self.onThemeChanged = Instance.new("BindableEvent")
-	self.isVisible = true
-	
-	-- цвета тем
-	self.themes = {
-		light = {
-			bg = Color3.fromRGB(240, 240, 240),
-			buttonBg = Color3.fromRGB(220, 220, 220),
-			text = Color3.fromRGB(30, 30, 30),
-			textDim = Color3.fromRGB(100, 100, 100),
-			toggleOn = Color3.fromRGB(76, 175, 80),
-			toggleOff = Color3.fromRGB(200, 80, 80),
-			sliderBg = Color3.fromRGB(180, 180, 180),
-			sliderFill = Color3.fromRGB(66, 133, 244),
-			grabber = Color3.fromRGB(255, 255, 255),
-		},
-		dark = {
-			bg = Color3.fromRGB(35, 35, 40),
-			buttonBg = Color3.fromRGB(55, 55, 65),
-			text = Color3.fromRGB(230, 230, 230),
-			textDim = Color3.fromRGB(150, 150, 150),
-			toggleOn = Color3.fromRGB(76, 175, 80),
-			toggleOff = Color3.fromRGB(200, 80, 80),
-			sliderBg = Color3.fromRGB(80, 80, 90),
-			sliderFill = Color3.fromRGB(66, 133, 244),
-			grabber = Color3.fromRGB(255, 255, 255),
-		}
+	local title = config.Title or "UI"
+	local sizeRatio = config.SizeRatio or "3:4" -- ширина:высота
+	local themeName = config.Theme or "Dark"
+	local toggleKey = config.ToggleKey or Enum.KeyCode.LeftControl
+	local tabs = config.Tabs or {} -- структура вкладок, но мы позволим добавлять позже
+
+	-- Парсинг соотношения
+	local w, h = string.match(sizeRatio, "(%d+):(%d+)")
+	if not w or not h then w, h = 3, 4 end
+	w, h = tonumber(w), tonumber(h)
+
+	-- Создание ScreenGui
+	local screenGui = Instance.new("ScreenGui")
+	screenGui.Name = "CustomUIModule"
+	screenGui.Parent = PlayerGui
+
+	-- Базовый размер окна (в пикселях)
+	local baseWidth = 600
+	local baseHeight = baseWidth * (h / w)
+
+	-- Масштабирование для разных экранов
+	local viewportSize = workspace.CurrentCamera.ViewportSize
+	local maxWidth = viewportSize.X * 0.8
+	local maxHeight = viewportSize.Y * 0.8
+	local scaleX = maxWidth / baseWidth
+	local scaleY = maxHeight / baseHeight
+	local scale = math.min(scaleX, scaleY, 1.2) -- не больше 1.2, чтобы не было слишком мелко
+	if scale < 0.4 then scale = 0.4 end
+
+	local uiScale = Instance.new("UIScale")
+	uiScale.Scale = scale
+
+	-- Основной контейнер окна
+	local mainFrame = Instance.new("Frame")
+	mainFrame.Size = UDim2.new(0, baseWidth, 0, baseHeight)
+	mainFrame.Position = UDim2.new(0.5, -baseWidth/2, 0.5, -baseHeight/2)
+	mainFrame.BackgroundColor3 = THEMES[themeName].Background
+	mainFrame.BorderSizePixel = 0
+	mainFrame.Parent = screenGui
+	uiScale.Parent = mainFrame
+
+	-- Закругление окна
+	local mainCorner = Instance.new("UICorner")
+	mainCorner.CornerRadius = UDim.new(0, 12)
+	mainCorner.Parent = mainFrame
+
+	-- Тень
+	local shadow = Instance.new("Frame")
+	shadow.Size = UDim2.new(1, 10, 1, 10)
+	shadow.Position = UDim2.new(0, -5, 0, -5)
+	shadow.BackgroundColor3 = Color3.new(0,0,0)
+	shadow.BackgroundTransparency = 0.4
+	shadow.BorderSizePixel = 0
+	shadow.Parent = mainFrame
+	local shadowCorner = Instance.new("UICorner")
+	shadowCorner.CornerRadius = UDim.new(0, 12)
+	shadowCorner.Parent = shadow
+	shadow.ZIndex = 0
+
+	-- Заголовок (левый верхний угол)
+	local titleLabel = createStyledTextLabel(mainFrame, title, UDim2.new(0.5, -20, 0, 36), UDim2.new(0, 20, 0, 0), THEMES[themeName].Text, Enum.Font.GothamBold, 20)
+	titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+	-- Кнопка закрытия (крестик) — скрывает GUI (но не удаляет)
+	local closeButton = createStyledButton(mainFrame, "✕", UDim2.new(0, 30, 0, 30), UDim2.new(1, -40, 0, 10), Color3.fromRGB(200,50,50), Color3.new(1,1,1), 6, function()
+		mainFrame.Visible = false
+	end)
+	closeButton.TextSize = 18
+
+	-- Правая панель вкладок
+	local tabsPanel = Instance.new("ScrollingFrame")
+	tabsPanel.Size = UDim2.new(0, 140, 1, -50)
+	tabsPanel.Position = UDim2.new(1, -145, 0, 45)
+	tabsPanel.BackgroundColor3 = THEMES[themeName].BackgroundSecondary
+	tabsPanel.BorderSizePixel = 0
+	tabsPanel.Parent = mainFrame
+	tabsPanel.CanvasSize = UDim2.new(0, 0, 0, 0)
+	tabsPanel.ScrollBarThickness = 4
+	tabsPanel.ScrollBarImageColor3 = THEMES[themeName].ScrollBar
+	tabsPanel.AutomaticCanvasSize = Enum.AutomaticSize.Y
+
+	local tabsCorner = Instance.new("UICorner")
+	tabsCorner.CornerRadius = UDim.new(0, 8)
+	tabsCorner.Parent = tabsPanel
+
+	-- Разделительная линия между панелью вкладок и содержимым
+	local divider = Instance.new("Frame")
+	divider.Size = UDim2.new(0, 1, 1, -50)
+	divider.Position = UDim2.new(1, -145, 0, 45)
+	divider.BackgroundColor3 = THEMES[themeName].Border
+	divider.BorderSizePixel = 0
+	divider.Parent = mainFrame
+
+	-- Контейнер содержимого вкладок
+	local contentContainer = Instance.new("Frame")
+	contentContainer.Size = UDim2.new(1, -155, 1, -50)
+	contentContainer.Position = UDim2.new(0, 0, 0, 45)
+	contentContainer.BackgroundTransparency = 1
+	contentContainer.Parent = mainFrame
+	contentContainer.ClipsDescendants = true
+
+	-- Данные
+	local self = {
+		ScreenGui = screenGui,
+		MainFrame = mainFrame,
+		TitleLabel = titleLabel,
+		TabsPanel = tabsPanel,
+		ContentContainer = contentContainer,
+		Divider = divider,
+		CloseButton = closeButton,
+		UITheme = themeName,
+		ToggleKey = toggleKey,
+		CurrentTab = nil,
+		Tabs = {}, -- {name = string, button = TextButton, content = Frame}
+		TabButtons = {},
+		Elements = {}, -- храним все элементы для обновления темы
+		BindableFunctions = {}, -- для биндов
+		IsVisible = true,
+		Scale = scale,
+		BaseWidth = baseWidth,
+		BaseHeight = baseHeight,
 	}
-	self.themeColors = self.themes[self.theme] or self.themes.light
-	
-	-- создаем GUI
-	self:createUI()
-	self:setupToggleKey()
-	
+
+	setmetatable(self, {__index = UIModule})
+
+	-- Добавление вкладки "Настройки" (всегда есть)
+	self:AddTab("Настройки")
+
+	-- Добавляем элементы настройки
+	local settingsTab = self.Tabs["Настройки"].content
+	-- Выбор темы
+	local themeDropdownData = {
+		Label = "Тема",
+		Items = {"Dark", "Light", "Blue"},
+		MultiSelect = false,
+		Default = {self.UITheme},
+		OnSelect = function(selected)
+			if selected and #selected > 0 then
+				self:SetTheme(selected[1])
+			end
+		end
+	}
+	self:AddDropdown("Настройки", themeDropdownData)
+
+	-- Настройка клавиши показа/скрытия
+	local keybindData = {
+		Label = "Клавиша показа",
+		Items = {"LeftControl", "LeftShift", "LeftAlt", "RightControl", "RightShift", "RightAlt", "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12"},
+		MultiSelect = false,
+		Default = {tostring(toggleKey):gsub("Enum.KeyCode.", "")},
+		OnSelect = function(selected)
+			if selected and #selected > 0 then
+				local keyString = selected[1]
+				local key = Enum.KeyCode[keyString]
+				if key then
+					self:SetToggleKey(key)
+				end
+			end
+		end
+	}
+	self:AddDropdown("Настройки", keybindData)
+
+	-- Добавление вкладок из конфига (если есть)
+	for _, tabData in ipairs(tabs) do
+		self:AddTab(tabData.Name)
+		if tabData.Elements then
+			for _, element in ipairs(tabData.Elements) do
+				if element.Type == "ButtonToggle" then
+					self:AddButtonToggle(tabData.Name, element.Config)
+				elseif element.Type == "Button" then
+					self:AddButton(tabData.Name, element.Config)
+				elseif element.Type == "Slider" then
+					self:AddSlider(tabData.Name, element.Config)
+				elseif element.Type == "Dropdown" then
+					self:AddDropdown(tabData.Name, element.Config)
+				end
+			end
+		end
+	end
+
+	-- Переключение на первую вкладку (не настройки, если есть другие)
+	local firstTab = next(self.Tabs)
+	if firstTab and firstTab ~= "Настройки" then
+		self:SelectTab(firstTab)
+	elseif self.Tabs["Настройки"] then
+		self:SelectTab("Настройки")
+	end
+
+	-- Обработчик клавиши показа/скрытия
+	local toggleConnection
+	toggleConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+		if gameProcessed then return end
+		if input.KeyCode == self.ToggleKey then
+			self:ToggleVisibility()
+		end
+	end)
+
+	-- Сохраняем соединение для очистки
+	self.ToggleConnection = toggleConnection
+
+	-- Функция для обновления темы всех элементов
+	function self:ApplyTheme(themeName)
+		local theme = THEMES[themeName]
+		if not theme then return end
+
+		self.MainFrame.BackgroundColor3 = theme.Background
+		self.TitleLabel.TextColor3 = theme.Text
+		self.TabsPanel.BackgroundColor3 = theme.BackgroundSecondary
+		self.Divider.BackgroundColor3 = theme.Border
+
+		-- Обновляем кнопки вкладок
+		for name, tabData in pairs(self.Tabs) do
+			local btn = tabData.button
+			if btn then
+				btn.BackgroundColor3 = (self.CurrentTab == name) and theme.BackgroundAccent or theme.BackgroundSecondary
+				btn.TextColor3 = (self.CurrentTab == name) and theme.Text or theme.TextSecondary
+			end
+		end
+
+		-- Обновляем элементы внутри вкладок (рекурсивно)
+		for _, element in ipairs(self.Elements) do
+			if element.UpdateTheme then
+				element:UpdateTheme(theme)
+			end
+		end
+
+		-- Обновляем настройки (выпадающие списки и т.д.) - они уже обновятся через элементы
+	end
+
+	-- Установка темы
+	function self:SetTheme(newTheme)
+		if THEMES[newTheme] then
+			self.UITheme = newTheme
+			self:ApplyTheme(newTheme)
+			-- Можно вызвать событие сохранения
+			if self.OnThemeChanged then
+				self.OnThemeChanged(newTheme)
+			end
+		end
+	end
+
+	-- Получение текущей темы
+	function self:GetTheme()
+		return self.UITheme
+	end
+
+	-- Установка клавиши
+	function self:SetToggleKey(newKey)
+		self.ToggleKey = newKey
+	end
+
+	-- Переключение видимости
+	function self:ToggleVisibility()
+		self.IsVisible = not self.IsVisible
+		self.MainFrame.Visible = self.IsVisible
+	end
+
+	-- Показать/скрыть
+	function self:Show()
+		self.IsVisible = true
+		self.MainFrame.Visible = true
+	end
+
+	function self:Hide()
+		self.IsVisible = false
+		self.MainFrame.Visible = false
+	end
+
+	-- Сохранение темы (пользователь может переопределить)
+	self.SaveTheme = function(theme)
+		-- По умолчанию ничего не делаем, но можно переопределить через setSaveFunction
+	end
+
+	self.SetSaveFunction = function(func)
+		self.SaveTheme = func
+	end
+
+	-- Событие изменения темы
+	self.OnThemeChanged = nil
+
+	-- Установка обработчика изменения темы
+	self.SetThemeChangedCallback = function(callback)
+		self.OnThemeChanged = callback
+	end
+
+	-- Добавление элемента в список для обновления темы
+	local function registerElement(element)
+		table.insert(self.Elements, element)
+	end
+
+	-- Функция для создания контента вкладки
+	local function createTabContent(tabName)
+		local content = Instance.new("ScrollingFrame")
+		content.Size = UDim2.new(1, -10, 1, -10)
+		content.Position = UDim2.new(0, 5, 0, 5)
+		content.BackgroundTransparency = 1
+		content.BorderSizePixel = 0
+		content.Parent = self.ContentContainer
+		content.Visible = false
+		content.CanvasSize = UDim2.new(0, 0, 0, 0)
+		content.ScrollBarThickness = 6
+		content.ScrollBarImageColor3 = THEMES[self.UITheme].ScrollBar
+		content.AutomaticCanvasSize = Enum.AutomaticSize.Y
+		content.ClipsDescendants = true
+
+		local layout = Instance.new("UIListLayout")
+		layout.Padding = UDim.new(0, 8)
+		layout.SortOrder = Enum.SortOrder.LayoutOrder
+		layout.Parent = content
+
+		return content
+	end
+
+	-- Добавление вкладки
+	function self:AddTab(tabName)
+		if self.Tabs[tabName] then return end
+
+		-- Создаем кнопку в панели вкладок
+		local tabButton = createStyledButton(self.TabsPanel, tabName, UDim2.new(1, -16, 0, 32), UDim2.new(0, 8, 0, #self.TabButtons * 38 + 8), THEMES[self.UITheme].BackgroundSecondary, THEMES[self.UITheme].TextSecondary, 6, function()
+			self:SelectTab(tabName)
+		end)
+		tabButton.TextXAlignment = Enum.TextXAlignment.Left
+		tabButton.TextSize = 14
+		tabButton.AutoButtonColor = false
+
+		-- Содержимое вкладки
+		local content = createTabContent(tabName)
+
+		-- Сохраняем
+		self.Tabs[tabName] = {
+			button = tabButton,
+			content = content,
+		}
+		table.insert(self.TabButtons, tabButton)
+
+		-- Обновляем CanvasSize панели вкладок
+		self.TabsPanel.CanvasSize = UDim2.new(0, 0, 0, #self.TabButtons * 38 + 8)
+
+		-- Если это первая вкладка (не настройки) и текущая не выбрана, выбираем её
+		if not self.CurrentTab and tabName ~= "Настройки" then
+			self:SelectTab(tabName)
+		end
+
+		return self
+	end
+
+	-- Выбор вкладки
+	function self:SelectTab(tabName)
+		local tabData = self.Tabs[tabName]
+		if not tabData then return end
+
+		-- Скрываем все содержимое
+		for name, data in pairs(self.Tabs) do
+			data.content.Visible = false
+		end
+
+		-- Показываем выбранное
+		tabData.content.Visible = true
+		self.CurrentTab = tabName
+
+		-- Обновляем стиль кнопок
+		local theme = THEMES[self.UITheme]
+		for name, data in pairs(self.Tabs) do
+			local btn = data.button
+			if btn then
+				if name == tabName then
+					btn.BackgroundColor3 = theme.BackgroundAccent
+					btn.TextColor3 = theme.Text
+				else
+					btn.BackgroundColor3 = theme.BackgroundSecondary
+					btn.TextColor3 = theme.TextSecondary
+				end
+			end
+		end
+
+		-- Сбрасываем прокрутку контента
+		tabData.content.CanvasPosition = Vector2.new(0, 0)
+	end
+
+	-- Добавление элементов
+	-- 1) Кнопка-переключатель с биндом
+	function self:AddButtonToggle(tabName, config)
+		config = config or {}
+		local label = config.Label or "Toggle"
+		local keybind = config.Keybind or Enum.KeyCode.None
+		local defaultState = config.DefaultState or false
+		local onToggle = config.OnToggle or function() end
+
+		local tabData = self.Tabs[tabName]
+		if not tabData then return end
+
+		local content = tabData.content
+
+		-- Создаем фрейм для элемента
+		local elementFrame = Instance.new("Frame")
+		elementFrame.Size = UDim2.new(1, -10, 0, 36)
+		elementFrame.BackgroundColor3 = THEMES[self.UITheme].BackgroundAccent
+		elementFrame.BorderSizePixel = 0
+		elementFrame.Parent = content
+
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = UDim.new(0, 6)
+		corner.Parent = elementFrame
+
+		-- Название
+		local labelText = createStyledTextLabel(elementFrame, label, UDim2.new(0.6, -50, 1, 0), UDim2.new(0, 10, 0, 0), THEMES[self.UITheme].Text, Enum.Font.GothamMedium, 15)
+		labelText.TextXAlignment = Enum.TextXAlignment.Left
+
+		-- Бинд-индикатор
+		local bindText = (keybind ~= Enum.KeyCode.None) and "[" .. tostring(keybind):gsub("Enum.KeyCode.", "") .. "]" or ""
+		local bindLabel = createStyledTextLabel(elementFrame, bindText, UDim2.new(0.2, 0, 1, 0), UDim2.new(0.7, 0, 0, 0), THEMES[self.UITheme].TextSecondary, Enum.Font.GothamMedium, 12)
+		bindLabel.TextXAlignment = Enum.TextXAlignment.Right
+
+		-- Кнопка-переключатель
+		local toggleButton = Instance.new("TextButton")
+		toggleButton.Size = UDim2.new(0, 50, 0, 24)
+		toggleButton.Position = UDim2.new(1, -60, 0.5, -12)
+		toggleButton.BackgroundColor3 = defaultState and THEMES[self.UITheme].ToggleOn or THEMES[self.UITheme].ToggleOff
+		toggleButton.Text = ""
+		toggleButton.BorderSizePixel = 0
+		toggleButton.Parent = elementFrame
+		local toggleCorner = Instance.new("UICorner")
+		toggleCorner.CornerRadius = UDim.new(1, 0)
+		toggleCorner.Parent = toggleButton
+
+		-- Кружок внутри переключателя
+		local circle = Instance.new("Frame")
+		circle.Size = UDim2.new(0, 18, 0, 18)
+		circle.Position = defaultState and UDim2.new(1, -22, 0.5, -9) or UDim2.new(0, 4, 0.5, -9)
+		circle.BackgroundColor3 = Color3.new(1,1,1)
+		circle.BorderSizePixel = 0
+		circle.Parent = toggleButton
+		local circleCorner = Instance.new("UICorner")
+		circleCorner.CornerRadius = UDim.new(1, 0)
+		circleCorner.Parent = circle
+
+		local state = defaultState
+
+		local function updateToggle(newState)
+			state = newState
+			toggleButton.BackgroundColor3 = state and THEMES[self.UITheme].ToggleOn or THEMES[self.UITheme].ToggleOff
+			local targetPos = state and UDim2.new(1, -22, 0.5, -9) or UDim2.new(0, 4, 0.5, -9)
+			TweenService:Create(circle, TweenInfo.new(0.15), {Position = targetPos}):Play()
+			onToggle(state)
+		end
+
+		toggleButton.MouseButton1Click:Connect(function()
+			updateToggle(not state)
+		end)
+
+		-- Бинд клавиши
+		if keybind ~= Enum.KeyCode.None then
+			local bindConnection
+			bindConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+				if gameProcessed then return end
+				if input.KeyCode == keybind then
+					updateToggle(not state)
+				end
+			end)
+			-- Сохраняем для очистки
+			table.insert(self.BindableFunctions, bindConnection)
+		end
+
+		-- Регистрируем элемент для обновления темы
+		local element = {
+			UpdateTheme = function(theme)
+				elementFrame.BackgroundColor3 = theme.BackgroundAccent
+				labelText.TextColor3 = theme.Text
+				bindLabel.TextColor3 = theme.TextSecondary
+				toggleButton.BackgroundColor3 = state and theme.ToggleOn or theme.ToggleOff
+			end,
+			SetState = function(newState)
+				updateToggle(newState)
+			end,
+			GetState = function()
+				return state
+			end,
+		}
+		registerElement(element)
+
+		return element
+	end
+
+	-- 2) Обычная кнопка без бинда
+	function self:AddButton(tabName, config)
+		config = config or {}
+		local label = config.Label or "Button"
+		local onClick = config.OnClick or function() end
+
+		local tabData = self.Tabs[tabName]
+		if not tabData then return end
+
+		local content = tabData.content
+
+		local elementFrame = Instance.new("Frame")
+		elementFrame.Size = UDim2.new(1, -10, 0, 36)
+		elementFrame.BackgroundColor3 = THEMES[self.UITheme].BackgroundAccent
+		elementFrame.BorderSizePixel = 0
+		elementFrame.Parent = content
+
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = UDim.new(0, 6)
+		corner.Parent = elementFrame
+
+		local button = createStyledButton(elementFrame, label, UDim2.new(1, -10, 1, -6), UDim2.new(0, 5, 0, 3), THEMES[self.UITheme].Accent, THEMES[self.UITheme].Text, 6, onClick)
+
+		-- Регистрируем для обновления темы
+		local element = {
+			UpdateTheme = function(theme)
+				elementFrame.BackgroundColor3 = theme.BackgroundAccent
+				button.BackgroundColor3 = theme.Accent
+				button.TextColor3 = theme.Text
+			end,
+		}
+		registerElement(element)
+
+		return element
+	end
+
+	-- 3) Ползунок
+	function self:AddSlider(tabName, config)
+		config = config or {}
+		local label = config.Label or "Slider"
+		local min = config.Min or 0
+		local max = config.Max or 100
+		local default = config.Default or (min + max) / 2
+		local onChanged = config.OnChanged or function() end
+
+		local tabData = self.Tabs[tabName]
+		if not tabData then return end
+
+		local content = tabData.content
+
+		local elementFrame = Instance.new("Frame")
+		elementFrame.Size = UDim2.new(1, -10, 0, 50)
+		elementFrame.BackgroundColor3 = THEMES[self.UITheme].BackgroundAccent
+		elementFrame.BorderSizePixel = 0
+		elementFrame.Parent = content
+
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = UDim.new(0, 6)
+		corner.Parent = elementFrame
+
+		-- Название и значение
+		local labelText = createStyledTextLabel(elementFrame, label, UDim2.new(0.6, -50, 0, 20), UDim2.new(0, 10, 0, 0), THEMES[self.UITheme].Text, Enum.Font.GothamMedium, 15)
+		labelText.TextXAlignment = Enum.TextXAlignment.Left
+		labelText.TextYAlignment = Enum.TextYAlignment.Top
+
+		local valueLabel = createStyledTextLabel(elementFrame, tostring(default), UDim2.new(0.3, -10, 0, 20), UDim2.new(0.7, 0, 0, 0), THEMES[self.UITheme].TextSecondary, Enum.Font.GothamMedium, 14)
+		valueLabel.TextXAlignment = Enum.TextXAlignment.Right
+		valueLabel.TextYAlignment = Enum.TextYAlignment.Top
+
+		-- Слайдер (трек)
+		local track = Instance.new("Frame")
+		track.Size = UDim2.new(0.9, -20, 0, 6)
+		track.Position = UDim2.new(0.05, 0, 0, 35)
+		track.BackgroundColor3 = THEMES[self.UITheme].SliderTrack
+		track.BorderSizePixel = 0
+		track.Parent = elementFrame
+		local trackCorner = Instance.new("UICorner")
+		trackCorner.CornerRadius = UDim.new(1, 0)
+		trackCorner.Parent = track
+
+		-- Заполнение
+		local fill = Instance.new("Frame")
+		fill.Size = UDim2.new(0, 0, 1, 0)
+		fill.BackgroundColor3 = THEMES[self.UITheme].SliderFill
+		fill.BorderSizePixel = 0
+		fill.Parent = track
+		local fillCorner = Instance.new("UICorner")
+		fillCorner.CornerRadius = UDim.new(1, 0)
+		fillCorner.Parent = fill
+
+		-- Круглый ползунок
+		local thumb = Instance.new("Frame")
+		thumb.Size = UDim2.new(0, 16, 0, 16)
+		thumb.Position = UDim2.new(0, -8, 0.5, -8)
+		thumb.BackgroundColor3 = THEMES[self.UITheme].Accent
+		thumb.BorderSizePixel = 0
+		thumb.Parent = track
+		local thumbCorner = Instance.new("UICorner")
+		thumbCorner.CornerRadius = UDim.new(1, 0)
+		thumbCorner.Parent = thumb
+
+		local value = math.clamp(default, min, max)
+		local function updateSlider(newValue)
+			value = math.clamp(newValue, min, max)
+			local percent = (value - min) / (max - min)
+			fill.Size = UDim2.new(percent, 0, 1, 0)
+			thumb.Position = UDim2.new(percent, -8, 0.5, -8)
+			valueLabel.Text = tostring(math.floor(value * 100) / 100) -- округление
+			onChanged(value)
+		end
+
+		updateSlider(value)
+
+		-- Drag функциональность
+		local dragging = false
+		local connection
+		local function startDrag()
+			dragging = true
+			connection = RunService.RenderStepped:Connect(function()
+				if not dragging then return end
+				local mouse = LocalPlayer:GetMouse()
+				local trackPos = track.AbsolutePosition
+				local trackSize = track.AbsoluteSize
+				local x = math.clamp((mouse.X - trackPos.X) / trackSize.X, 0, 1)
+				local newVal = min + (max - min) * x
+				updateSlider(newVal)
+			end)
+		end
+		local function stopDrag()
+			dragging = false
+			if connection then
+				connection:Disconnect()
+				connection = nil
+			end
+		end
+
+		thumb.InputBegan:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.MouseButton1 then
+				startDrag()
+			end
+		end)
+		track.InputBegan:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.MouseButton1 then
+				startDrag()
+			end
+		end)
+		UserInputService.InputEnded:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.MouseButton1 then
+				stopDrag()
+			end
+		end)
+
+		-- Регистрируем для обновления темы
+		local element = {
+			UpdateTheme = function(theme)
+				elementFrame.BackgroundColor3 = theme.BackgroundAccent
+				labelText.TextColor3 = theme.Text
+				valueLabel.TextColor3 = theme.TextSecondary
+				track.BackgroundColor3 = theme.SliderTrack
+				fill.BackgroundColor3 = theme.SliderFill
+				thumb.BackgroundColor3 = theme.Accent
+			end,
+			SetValue = function(newValue)
+				updateSlider(newValue)
+			end,
+			GetValue = function()
+				return value
+			end,
+		}
+		registerElement(element)
+
+		return element
+	end
+
+	-- 4) Выпадающий список
+	function self:AddDropdown(tabName, config)
+		config = config or {}
+		local label = config.Label or "Dropdown"
+		local items = config.Items or {}
+		local multiSelect = config.MultiSelect or false
+		local default = config.Default or {}
+		local onSelect = config.OnSelect or function() end
+
+		local tabData = self.Tabs[tabName]
+		if not tabData then return end
+
+		local content = tabData.content
+
+		local elementFrame = Instance.new("Frame")
+		elementFrame.Size = UDim2.new(1, -10, 0, 44)
+		elementFrame.BackgroundColor3 = THEMES[self.UITheme].BackgroundAccent
+		elementFrame.BorderSizePixel = 0
+		elementFrame.Parent = content
+
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = UDim.new(0, 6)
+		corner.Parent = elementFrame
+
+		-- Название
+		local labelText = createStyledTextLabel(elementFrame, label, UDim2.new(0.4, -10, 1, 0), UDim2.new(0, 10, 0, 0), THEMES[self.UITheme].Text, Enum.Font.GothamMedium, 15)
+		labelText.TextXAlignment = Enum.TextXAlignment.Left
+
+		-- Кнопка для открытия списка
+		local dropdownButton = createStyledButton(elementFrame, "Выбрать", UDim2.new(0.5, -10, 1, -6), UDim2.new(0.45, 0, 0, 3), THEMES[self.UITheme].Accent, THEMES[self.UITheme].Text, 6, function()
+			-- Показываем/скрываем список
+			local isOpen = dropdownList.Visible
+			dropdownList.Visible = not isOpen
+		end)
+		dropdownButton.TextXAlignment = Enum.TextXAlignment.Center
+
+		-- Контейнер для списка (всплывающий)
+		local dropdownList = Instance.new("ScrollingFrame")
+		dropdownList.Size = UDim2.new(0.5, -10, 0, 120)
+		dropdownList.Position = UDim2.new(0.45, 0, 1, 2)
+		dropdownList.BackgroundColor3 = THEMES[self.UITheme].BackgroundSecondary
+		dropdownList.BorderSizePixel = 0
+		dropdownList.Parent = elementFrame
+		dropdownList.Visible = false
+		dropdownList.ZIndex = 10
+		dropdownList.CanvasSize = UDim2.new(0, 0, 0, 0)
+		dropdownList.ScrollBarThickness = 4
+		dropdownList.ScrollBarImageColor3 = THEMES[self.UITheme].ScrollBar
+		dropdownList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+		dropdownList.ClipsDescendants = true
+		local listCorner = Instance.new("UICorner")
+		listCorner.CornerRadius = UDim.new(0, 6)
+		listCorner.Parent = dropdownList
+
+		local listLayout = Instance.new("UIListLayout")
+		listLayout.Padding = UDim.new(0, 2)
+		listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+		listLayout.Parent = dropdownList
+
+		-- Выбранные элементы (храним индексы или значения)
+		local selectedItems = {}
+		for _, item in ipairs(default) do
+			table.insert(selectedItems, item)
+		end
+
+		local function updateDropdownButtonText()
+			if #selectedItems == 0 then
+				dropdownButton.Text = "Выбрать"
+			elseif multiSelect then
+				dropdownButton.Text = table.concat(selectedItems, ", ")
+			else
+				dropdownButton.Text = selectedItems[1] or "Выбрать"
+			end
+		end
+
+		-- Создаём элементы списка
+		local itemButtons = {}
+		for i, item in ipairs(items) do
+			local btn = Instance.new("TextButton")
+			btn.Size = UDim2.new(1, -4, 0, 28)
+			btn.Position = UDim2.new(0, 2, 0, (i-1)*30 + 2)
+			btn.BackgroundColor3 = THEMES[self.UITheme].BackgroundAccent
+			btn.Text = tostring(item)
+			btn.TextColor3 = THEMES[self.UITheme].Text
+			btn.TextSize = 14
+			btn.Font = Enum.Font.GothamMedium
+			btn.BorderSizePixel = 0
+			btn.AutoButtonColor = false
+			btn.Parent = dropdownList
+			local btnCorner = Instance.new("UICorner")
+			btnCorner.CornerRadius = UDim.new(0, 4)
+			btnCorner.Parent = btn
+
+			-- Галочка выбора
+			local checkmark = Instance.new("TextLabel")
+			checkmark.Size = UDim2.new(0, 20, 1, 0)
+			checkmark.Position = UDim2.new(1, -25, 0, 0)
+			checkmark.BackgroundTransparency = 1
+			checkmark.Text = "✓"
+			checkmark.TextColor3 = THEMES[self.UITheme].Accent
+			checkmark.TextSize = 18
+			checkmark.Font = Enum.Font.GothamBold
+			checkmark.Visible = false
+			checkmark.Parent = btn
+
+			local isSelected = false
+			for _, sel in ipairs(selectedItems) do
+				if sel == item then isSelected = true break end
+			end
+			if isSelected then
+				checkmark.Visible = true
+				btn.BackgroundColor3 = THEMES[self.UITheme].BackgroundAccent:Lerp(THEMES[self.UITheme].Accent, 0.2)
+			end
+
+			btn.MouseButton1Click:Connect(function()
+				if multiSelect then
+					-- Переключаем выбор
+					local found = false
+					for i, sel in ipairs(selectedItems) do
+						if sel == item then
+							table.remove(selectedItems, i)
+							found = true
+							break
+						end
+					end
+					if not found then
+						table.insert(selectedItems, item)
+					end
+					-- Обновляем галочки
+					for _, b in ipairs(itemButtons) do
+						local chk = b:FindFirstChild("TextLabel")
+						if chk then
+							local isSel = false
+							for _, sel in ipairs(selectedItems) do
+								if sel == b.Text then isSel = true break end
+							end
+							chk.Visible = isSel
+							b.BackgroundColor3 = isSel and THEMES[self.UITheme].BackgroundAccent:Lerp(THEMES[self.UITheme].Accent, 0.2) or THEMES[self.UITheme].BackgroundAccent
+						end
+					end
+					updateDropdownButtonText()
+					onSelect(selectedItems)
+				else
+					-- Одиночный выбор
+					selectedItems = {item}
+					for _, b in ipairs(itemButtons) do
+						local chk = b:FindFirstChild("TextLabel")
+						if chk then
+							local isSel = (b.Text == item)
+							chk.Visible = isSel
+							b.BackgroundColor3 = isSel and THEMES[self.UITheme].BackgroundAccent:Lerp(THEMES[self.UITheme].Accent, 0.2) or THEMES[self.UITheme].BackgroundAccent
+						end
+					end
+					updateDropdownButtonText()
+					onSelect(selectedItems)
+					dropdownList.Visible = false
+				end
+			end)
+
+			table.insert(itemButtons, btn)
+		end
+
+		-- Обновляем CanvasSize списка
+		dropdownList.CanvasSize = UDim2.new(0, 0, 0, #items * 30 + 4)
+
+		updateDropdownButtonText()
+
+		-- Закрытие списка при клике вне
+		local function closeDropdown()
+			dropdownList.Visible = false
+		end
+
+		-- Регистрируем для обновления темы
+		local element = {
+			UpdateTheme = function(theme)
+				elementFrame.BackgroundColor3 = theme.BackgroundAccent
+				labelText.TextColor3 = theme.Text
+				dropdownButton.BackgroundColor3 = theme.Accent
+				dropdownButton.TextColor3 = theme.Text
+				dropdownList.BackgroundColor3 = theme.BackgroundSecondary
+				dropdownList.ScrollBarImageColor3 = theme.ScrollBar
+				for _, btn in ipairs(itemButtons) do
+					local isSel = false
+					for _, sel in ipairs(selectedItems) do
+						if sel == btn.Text then isSel = true break end
+					end
+					btn.BackgroundColor3 = isSel and theme.BackgroundAccent:Lerp(theme.Accent, 0.2) or theme.BackgroundAccent
+					btn.TextColor3 = theme.Text
+					local chk = btn:FindFirstChild("TextLabel")
+					if chk then
+						chk.TextColor3 = theme.Accent
+					end
+				end
+			end,
+			GetSelected = function()
+				return selectedItems
+			end,
+			SetSelected = function(newSelected)
+				selectedItems = {}
+				for _, item in ipairs(newSelected) do
+					if table.find(items, item) then
+						table.insert(selectedItems, item)
+					end
+				end
+				-- Обновляем визуал
+				for _, btn in ipairs(itemButtons) do
+					local isSel = false
+					for _, sel in ipairs(selectedItems) do
+						if sel == btn.Text then isSel = true break end
+					end
+					local chk = btn:FindFirstChild("TextLabel")
+					if chk then
+						chk.Visible = isSel
+						btn.BackgroundColor3 = isSel and THEMES[self.UITheme].BackgroundAccent:Lerp(THEMES[self.UITheme].Accent, 0.2) or THEMES[self.UITheme].BackgroundAccent
+					end
+				end
+				updateDropdownButtonText()
+				onSelect(selectedItems)
+			end,
+		}
+		registerElement(element)
+
+		-- Закрытие списка при клике вне (по клику на mainFrame)
+		mainFrame.InputBegan:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.MouseButton1 then
+				local mousePos = input.Position
+				local listPos = dropdownList.AbsolutePosition
+				local listSize = dropdownList.AbsoluteSize
+				if dropdownList.Visible then
+					if not (mousePos.X >= listPos.X and mousePos.X <= listPos.X + listSize.X and
+							mousePos.Y >= listPos.Y and mousePos.Y <= listPos.Y + listSize.Y) then
+						dropdownList.Visible = false
+					end
+				end
+			end
+		end)
+
+		return element
+	end
+
+	-- Возвращаем объект UI
 	return self
 end
 
-function UIModule:createUI()
-	local player = game.Players.LocalPlayer
-	local playerGui = player:WaitForChild("PlayerGui")
-	
-	-- ScreenGui
-	local screenGui = Instance.new("ScreenGui")
-	screenGui.Name = "CustomUI"
-	screenGui.Parent = playerGui
-	self.screenGui = screenGui
-	
-	-- Main Frame с соотношением
-	local mainFrame = Instance.new("Frame")
-	mainFrame.Name = "MainFrame"
-	mainFrame.BackgroundColor3 = self.themeColors.bg
-	mainFrame.BackgroundTransparency = 0
-	mainFrame.Parent = screenGui
-	
-	-- размер: 45% ширины экрана, но не менее 300 и не более 600
-	local screenSize = playerGui.AbsoluteSize
-	local width = math.clamp(screenSize.X * 0.45, 300, 600)
-	local height = width / self.ratio
-	mainFrame.Size = UDim2.new(0, width, 0, height)
-	mainFrame.Position = UDim2.new(0.5, -width/2, 0.5, -height/2)
-	
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 12)
-	corner.Parent = mainFrame
-	
-	-- тень
-	local shadow = Instance.new("UIShadow")
-	shadow.Size = 10
-	shadow.Parent = mainFrame
-	
-	-- Верхняя панель (заголовок + кнопка настроек)
-	local topPanel = Instance.new("Frame")
-	topPanel.Size = UDim2.new(1, 0, 0, 40)
-	topPanel.BackgroundColor3 = self.themeColors.buttonBg
-	topPanel.BackgroundTransparency = 0
-	topPanel.Parent = mainFrame
-	local topCorner = Instance.new("UICorner")
-	topCorner.CornerRadius = UDim.new(0, 12)
-	topCorner.Parent = topPanel
-	-- обрезаем нижние углы
-	local topClip = Instance.new("UICorner")
-	topClip.CornerRadius = UDim.new(0, 0)
-	topClip.Parent = topPanel -- не работает, лучше сделать отдельный frame
-	
-	-- заголовок
-	local titleLabel = Instance.new("TextLabel")
-	titleLabel.Size = UDim2.new(0.7, -10, 1, 0)
-	titleLabel.Position = UDim2.new(0, 10, 0, 0)
-	titleLabel.BackgroundTransparency = 1
-	titleLabel.Text = self.title
-	titleLabel.TextColor3 = self.themeColors.text
-	titleLabel.Font = Enum.Font.GothamBold
-	titleLabel.TextSize = 20
-	titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-	titleLabel.TextYAlignment = Enum.TextYAlignment.Center
-	titleLabel.Parent = topPanel
-	
-	-- кнопка настроек (шестеренка)
-	local settingsBtn = Instance.new("TextButton")
-	settingsBtn.Size = UDim2.new(0, 30, 0, 30)
-	settingsBtn.Position = UDim2.new(1, -40, 0.5, -15)
-	settingsBtn.BackgroundColor3 = self.themeColors.buttonBg
-	settingsBtn.Text = "⚙"
-	settingsBtn.TextColor3 = self.themeColors.text
-	settingsBtn.Font = Enum.Font.Gotham
-	settingsBtn.TextSize = 20
-	settingsBtn.Parent = topPanel
-	local cornerBtn = Instance.new("UICorner")
-	cornerBtn.CornerRadius = UDim.new(1, 0)
-	cornerBtn.Parent = settingsBtn
-	
-	-- Основная область: левая панель (вкладки) и правая (содержимое)
-	local mainArea = Instance.new("Frame")
-	mainArea.Size = UDim2.new(1, 0, 1, -40)
-	mainArea.Position = UDim2.new(0, 0, 0, 40)
-	mainArea.BackgroundTransparency = 1
-	mainArea.Parent = mainFrame
-	
-	-- Левая панель (вкладки)
-	local leftPanel = Instance.new("Frame")
-	leftPanel.Size = UDim2.new(0.3, 0, 1, 0)
-	leftPanel.BackgroundTransparency = 0
-	leftPanel.BackgroundColor3 = self.themeColors.buttonBg
-	leftPanel.Parent = mainArea
-	local leftCorner = Instance.new("UICorner")
-	leftCorner.CornerRadius = UDim.new(0, 0)
-	leftCorner.Parent = leftPanel
-	-- обрезаем правый угол
-	local clip = Instance.new("UICorner")
-	clip.CornerRadius = UDim.new(0, 0)
-	clip.Parent = leftPanel
-	
-	-- ScrollingFrame для вкладок
-	local tabScroll = Instance.new("ScrollingFrame")
-	tabScroll.Size = UDim2.new(1, 0, 1, 0)
-	tabScroll.BackgroundTransparency = 1
-	tabScroll.BorderSizePixel = 0
-	tabScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-	tabScroll.ScrollBarThickness = 4
-	tabScroll.Parent = leftPanel
-	
-	local tabList = Instance.new("UIListLayout")
-	tabList.Padding = UDim.new(0, 5)
-	tabList.SortOrder = Enum.SortOrder.LayoutOrder
-	tabList.Parent = tabScroll
-	
-	self.mainFrame = mainFrame
-	self.topPanel = topPanel
-	self.leftPanel = tabScroll
-	self.rightPanel = mainArea:FindFirstChild("RightPanel") or (function()
-		local right = Instance.new("Frame")
-		right.Size = UDim2.new(0.7, 0, 1, 0)
-		right.Position = UDim2.new(0.3, 0, 0, 0)
-		right.BackgroundTransparency = 1
-		right.Parent = mainArea
-		return right
-	end)()
-	
-	-- встроенная вкладка "Настройки" (всегда первая)
-	local settingsTab = self:addTab("Настройки")
-	-- добавляем элементы настроек: выбор темы и клавиша
-	local themeDropdown = settingsTab:addDropdown("Тема", {
-		options = {"light", "dark"},
-		mode = "single",
-		default = self.theme
-	})
-	themeDropdown.onChanged:Connect(function(value)
-		if value then
-			self:setTheme(value)
-		end
-	end)
-	
-	local keyInput = settingsTab:addDropdown("Клавиша показа", {
-		options = {"F1", "F2", "F3", "F4", "RightShift", "LeftShift", "Tab"},
-		mode = "single",
-		default = self.toggleKey.Name
-	})
-	keyInput.onChanged:Connect(function(value)
-		if value then
-			local keyMap = {
-				F1 = Enum.KeyCode.F1,
-				F2 = Enum.KeyCode.F2,
-				F3 = Enum.KeyCode.F3,
-				F4 = Enum.KeyCode.F4,
-				RightShift = Enum.KeyCode.RightShift,
-				LeftShift = Enum.KeyCode.LeftShift,
-				Tab = Enum.KeyCode.Tab
-			}
-			local newKey = keyMap[value]
-			if newKey then
-				self:setToggleKey(newKey)
-			end
-		end
-	end)
-	
-	-- сохраняем ссылки для обновления тем
-	self.settingsTab = settingsTab
-	self.themeDropdown = themeDropdown
-	self.keyInput = keyInput
-	
-	-- кнопка настроек открывает вкладку настроек
-	settingsBtn.MouseButton1Click:Connect(function()
-		self:selectTab(self.tabs[1]) -- первая вкладка - настройки
-	end)
-	
-	-- изначально показываем первую вкладку (настройки)
-	if #self.tabs > 0 then
-		self:selectTab(self.tabs[1])
-	end
-	
-	-- обработка изменения размера экрана
-	game:GetService("UserInputService").WindowSizeChanged:Connect(function()
-		self:resizeUI()
-	end)
-	
-	self:resizeUI()
-end
-
-function UIModule:resizeUI()
-	local playerGui = game.Players.LocalPlayer:WaitForChild("PlayerGui")
-	local screenSize = playerGui.AbsoluteSize
-	local width = math.clamp(screenSize.X * 0.45, 300, 600)
-	local height = width / self.ratio
-	self.mainFrame.Size = UDim2.new(0, width, 0, height)
-	self.mainFrame.Position = UDim2.new(0.5, -width/2, 0.5, -height/2)
-end
-
-function UIModule:setupToggleKey()
-	local inputService = game:GetService("UserInputService")
-	self.toggleConnection = inputService.InputBegan:Connect(function(input, processed)
-		if processed then return end
-		if input.KeyCode == self.toggleKey and input.UserInputType == Enum.UserInputType.Keyboard then
-			self:toggle()
-		end
-	end)
-end
-
-function UIModule:addTab(name)
-	local tab = Tab.new(self, name)
-	table.insert(self.tabs, tab)
-	-- обновляем CanvasSize левой панели
-	local leftPanel = self.leftPanel
-	local list = leftPanel:FindFirstChildOfClass("UIListLayout")
-	if list then
-		-- после добавления нужно обновить canvas
-		task.wait() -- даем время на рендер
-		local count = #self.tabs
-		leftPanel.CanvasSize = UDim2.new(0, 0, 0, count * 40 + 10)
-	end
-	return tab
-end
-
-function UIModule:selectTab(tab)
-	if self.currentTab == tab then return end
-	if self.currentTab then
-		self.currentTab:hide()
-	end
-	self.currentTab = tab
-	tab:show()
-	-- подсветка кнопки
-	for _, t in ipairs(self.tabs) do
-		if t == tab then
-			t.guiBtn.BackgroundColor3 = self.themeColors.toggleOn -- или другой цвет
-		else
-			t.guiBtn.BackgroundColor3 = self.themeColors.buttonBg
-		end
-	end
-end
-
-function UIModule:setTheme(theme)
-	if theme == self.theme then return end
-	self.theme = theme
-	self.themeColors = self.themes[theme] or self.themes.light
-	-- обновить все элементы
-	self.mainFrame.BackgroundColor3 = self.themeColors.bg
-	self.topPanel.BackgroundColor3 = self.themeColors.buttonBg
-	-- обновить заголовок
-	local title = self.topPanel:FindFirstChildOfClass("TextLabel")
-	if title then title.TextColor3 = self.themeColors.text end
-	-- обновить кнопку настроек
-	local settingsBtn = self.topPanel:FindFirstChildOfClass("TextButton")
-	if settingsBtn then
-		settingsBtn.BackgroundColor3 = self.themeColors.buttonBg
-		settingsBtn.TextColor3 = self.themeColors.text
-	end
-	-- обновить левую панель
-	self.leftPanel.Parent.BackgroundColor3 = self.themeColors.buttonBg
-	-- обновить все вкладки и элементы
-	for _, tab in ipairs(self.tabs) do
-		tab:applyTheme(self.themeColors)
-	end
-	-- обновить дропдауны в настройках (они уже обновились через applyTheme)
-	-- обновляем выбранные значения в дропдауне темы и клавиши
-	if self.themeDropdown then
-		self.themeDropdown.selected = {[self.theme] = true}
-		self.themeDropdown:refreshOptions()
-		self.themeDropdown.guiObjects.btn.Text = self.themeDropdown:getDisplayText()
-	end
-	if self.keyInput then
-		local keyName = self.toggleKey.Name
-		self.keyInput.selected = {[keyName] = true}
-		self.keyInput:refreshOptions()
-		self.keyInput.guiObjects.btn.Text = self.keyInput:getDisplayText()
-	end
-	self.onThemeChanged:Fire(theme)
-end
-
-function UIModule:getTheme()
-	return self.theme
-end
-
-function UIModule:setToggleKey(key)
-	if key == self.toggleKey then return end
-	self.toggleKey = key
-	-- обновляем отображение в настройках
-	if self.keyInput then
-		self.keyInput.selected = {[key.Name] = true}
-		self.keyInput:refreshOptions()
-		self.keyInput.guiObjects.btn.Text = self.keyInput:getDisplayText()
-	end
-	-- переподключаем бинд
-	if self.toggleConnection then
-		self.toggleConnection:Disconnect()
-	end
-	self:setupToggleKey()
-end
-
-function UIModule:getToggleKey()
-	return self.toggleKey
-end
-
-function UIModule:show()
-	self.mainFrame.Visible = true
-	self.isVisible = true
-end
-
-function UIModule:hide()
-	self.mainFrame.Visible = false
-	self.isVisible = false
-end
-
-function UIModule:toggle()
-	if self.isVisible then
-		self:hide()
-	else
-		self:show()
-	end
+-- Функция для создания UI (для удобства)
+function UIModule.Create(config)
+	return UIModule.new(config)
 end
 
 return UIModule
