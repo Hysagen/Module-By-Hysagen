@@ -1,6 +1,6 @@
 --[[
     ModernUI Module - Полностью кастомизируемый интерфейс для скриптов
-    Версия: 1.0.2 (Исправлена ошибка конкатенации)
+    Версия: 1.0.3 (Исправлена ошибка clamp)
     Автор: AI Assistant
 ]]
 
@@ -592,6 +592,12 @@ function ModernUI:AddSlider(tabId, name, minValue, maxValue, defaultValue, callb
     local value = defaultValue or min
     
     local function updateSlider(newValue)
+        -- Защита от передачи таблицы или другого нечислового значения
+        if type(newValue) == "table" then
+            newValue = newValue[1] or 0
+        end
+        newValue = tonumber(newValue) or 0
+        
         value = math.clamp(newValue, min, max)
         local percentage = (value - min) / (max - min)
         sliderFill.Size = UDim2.new(percentage, 0, 1, 0)
@@ -606,8 +612,6 @@ function ModernUI:AddSlider(tabId, name, minValue, maxValue, defaultValue, callb
     
     sliderButton.MouseButton1Down:Connect(function()
         dragging = true
-        local startPos = sliderButton.AbsolutePosition.X
-        local containerSize = sliderBg.AbsoluteSize.X
         
         dragConnection = RunService.Heartbeat:Connect(function()
             if not dragging then
@@ -627,6 +631,14 @@ function ModernUI:AddSlider(tabId, name, minValue, maxValue, defaultValue, callb
             dragging = false
             if dragConnection then dragConnection:Disconnect() end
         end
+    end)
+    
+    -- Также обрабатываем клик по фону слайдера
+    sliderBg.MouseButton1Click:Connect(function()
+        local mousePos = UserInputService:GetMouseLocation().X
+        local offset = math.clamp((mousePos - sliderBg.AbsolutePosition.X) / sliderBg.AbsoluteSize.X, 0, 1)
+        local newValue = min + (max - min) * offset
+        updateSlider(newValue)
     end)
     
     table.insert(tab.Elements, {
