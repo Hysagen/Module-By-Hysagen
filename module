@@ -1,61 +1,88 @@
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
 local CoreGui = game:GetService("CoreGui")
 
 local Library = {
+    CurrentTheme = "Dark",
+    ToggleKey = Enum.KeyCode.RightControl,
     Themes = {
         Dark = {
-            Background = Color3.fromRGB(25, 25, 35),
-            Sidebar = Color3.fromRGB(20, 20, 28),
-            Element = Color3.fromRGB(35, 35, 48),
-            Accent = Color3.fromRGB(0, 162, 255),
-            Text = Color3.fromRGB(255, 255, 255)
+            Bg = Color3.fromRGB(24, 24, 32),
+            Sidebar = Color3.fromRGB(18, 18, 24),
+            Element = Color3.fromRGB(32, 32, 44),
+            Text = Color3.fromRGB(255, 255, 255),
+            Accent = Color3.fromRGB(88, 101, 242),
+            Border = Color3.fromRGB(45, 45, 60)
         },
         Light = {
-            Background = Color3.fromRGB(240, 240, 245),
+            Bg = Color3.fromRGB(240, 240, 245),
             Sidebar = Color3.fromRGB(220, 220, 230),
             Element = Color3.fromRGB(255, 255, 255),
-            Accent = Color3.fromRGB(0, 120, 215),
-            Text = Color3.fromRGB(30, 30, 30)
+            Text = Color3.fromRGB(30, 30, 35),
+            Accent = Color3.fromRGB(0, 122, 255),
+            Border = Color3.fromRGB(200, 200, 210)
         }
-    },
-    CurrentTheme = "Dark",
-    ToggleKey = Enum.KeyCode.RightControl
+    }
 }
+
+-- Авто-сохранение через файл (для хейтеров/инжекторов)
+local function SaveConfig(data)
+    if writefile then
+        pcall(function()
+            writefile("UI_Lib_Config.json", HttpService:JSONEncode(data))
+        end)
+    end
+end
+
+local function LoadConfig()
+    if readfile and isfile and isfile("UI_Lib_Config.json") then
+        local success, result = pcall(function()
+            return HttpService:JSONDecode(readfile("UI_Lib_Config.json"))
+        end)
+        if success then return result end
+    end
+    return nil
+end
 
 function Library:CreateWindow(config)
     config = config or {}
-    local titleText = config.Title or "UI Library"
-    local aspectRatio = config.AspectRatio or (3/4) -- Соотношение сторон
-    
-    -- Создание ScreenGui
+    local TitleText = config.Title or "UI Module"
+    local AspectRatioValue = config.AspectRatio or (4/3)
+
+    -- Чтение настроек
+    local savedData = LoadConfig() or {}
+    if savedData.Theme and Library.Themes[savedData.Theme] then
+        Library.CurrentTheme = savedData.Theme
+    end
+    if savedData.ToggleKey then
+        Library.ToggleKey = Enum.KeyCode[savedData.ToggleKey] or Library.ToggleKey
+    end
+
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = "CustomUI_" .. math.random(1000, 9999)
     ScreenGui.ResetOnSpawn = false
     
-    -- Безопасное добавление в CoreGui или PlayerGui
-    pcall(function()
-        ScreenGui.Parent = CoreGui
-    end)
+    pcall(function() ScreenGui.Parent = CoreGui end)
     if not ScreenGui.Parent then
         ScreenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
     end
 
-    -- Главная рамка (Main Frame)
-    local MainFrame = Instance.new("Frame")
+    -- Главный фрейм (Адаптивный под ПК и Телефон)
+    local MainFrame = Instance.new("Frame", ScreenGui)
     MainFrame.Name = "MainFrame"
-    MainFrame.Size = UDim2.new(0.4, 0, 0.4 * (1 / aspectRatio), 0) -- Адаптивный размер
-    MainFrame.Position = UDim2.new(0.3, 0, 0.3, 0)
-    MainFrame.BackgroundColor3 = Library.Themes[Library.CurrentTheme].Background
+    MainFrame.Size = UDim2.new(0.45, 0, 0.45 * (1 / AspectRatioValue), 0)
+    MainFrame.Position = UDim2.new(0.275, 0, 0.25, 0)
+    MainFrame.BackgroundColor3 = Library.Themes[Library.CurrentTheme].Bg
     MainFrame.BorderSizePixel = 0
     MainFrame.ClipsDescendants = true
-    MainFrame.Parent = ScreenGui
+    MainFrame.Active = true
 
-    local UICorner = Instance.new("UICorner", MainFrame)
-    UICorner.CornerRadius = UDim.new(0, 8)
+    local MainCorner = Instance.new("UICorner", MainFrame)
+    MainCorner.CornerRadius = UDim.new(0, 10)
 
-    local UIAspectRatio = Instance.new("UIAspectRatioConstraint", MainFrame)
-    UIAspectRatio.AspectRatio = aspectRatio
+    local AspectConstraint = Instance.new("UIAspectRatioConstraint", MainFrame)
+    AspectConstraint.AspectRatio = AspectRatioValue
 
     -- Верхняя панель (Header)
     local Header = Instance.new("Frame", MainFrame)
@@ -63,162 +90,370 @@ function Library:CreateWindow(config)
     Header.BackgroundColor3 = Library.Themes[Library.CurrentTheme].Sidebar
     Header.BorderSizePixel = 0
 
-    local Title = Instance.new("TextLabel", Header)
-    Title.Size = UDim2.new(0.6, 0, 1, 0)
-    Title.Position = UDim2.new(0.03, 0, 0, 0)
-    Title.Text = titleText
-    Title.TextColor3 = Library.Themes[Library.CurrentTheme].Text
-    Title.TextScaled = true
-    Title.Font = Enum.Font.GothamBold
-    Title.BackgroundTransparency = 1
-    Title.TextXAlignment = Enum.TextXAlignment.Left
+    local TitleLabel = Instance.new("TextLabel", Header)
+    TitleLabel.Size = UDim2.new(0.6, -10, 1, 0)
+    TitleLabel.Position = UDim2.new(0, 12, 0, 0)
+    TitleLabel.Text = TitleText
+    TitleLabel.TextColor3 = Library.Themes[Library.CurrentTheme].Text
+    TitleLabel.TextScaled = true
+    TitleLabel.Font = Enum.Font.GothamBold
+    TitleLabel.BackgroundTransparency = 1
+    TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
 
-    -- Кнопка настроек
+    -- Кнопка "Настройки" в шапке
     local SettingsBtn = Instance.new("TextButton", Header)
-    SettingsBtn.Size = UDim2.new(0.2, 0, 0.6, 0)
-    SettingsBtn.Position = UDim2.new(0.77, 0, 0.2, 0)
+    SettingsBtn.Size = UDim2.new(0.25, -10, 0.6, 0)
+    SettingsBtn.Position = UDim2.new(0.73, 0, 0.2, 0)
     SettingsBtn.Text = "Settings"
     SettingsBtn.BackgroundColor3 = Library.Themes[Library.CurrentTheme].Element
     SettingsBtn.TextColor3 = Library.Themes[Library.CurrentTheme].Text
-    SettingsBtn.Font = Enum.Font.Gotham
+    SettingsBtn.Font = Enum.Font.GothamMedium
+    SettingsBtn.TextSize = 12
 
-    -- Боковая панель для вкладок (Справа, со скроллом)
+    local SettingsCorner = Instance.new("UICorner", SettingsBtn)
+    SettingsCorner.CornerRadius = UDim.new(0, 6)
+
+    -- Правая панель вкладок (Скроллируемая)
     local Sidebar = Instance.new("ScrollingFrame", MainFrame)
-    Sidebar.Size = UDim2.new(0.25, 0, 0.88, 0)
-    Sidebar.Position = UDim2.new(0.75, 0, 0.12, 0)
+    Sidebar.Size = UDim2.new(0.28, 0, 0.88, 0)
+    Sidebar.Position = UDim2.new(0.72, 0, 0.12, 0)
     Sidebar.BackgroundColor3 = Library.Themes[Library.CurrentTheme].Sidebar
     Sidebar.BorderSizePixel = 0
-    Sidebar.ScrollBarThickness = 4
+    Sidebar.ScrollBarThickness = 3
+    Sidebar.CanvasSize = UDim2.new(0, 0, 0, 0)
 
     local SidebarLayout = Instance.new("UIListLayout", Sidebar)
     SidebarLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    SidebarLayout.Padding = UDim.new(0, 5)
+    SidebarLayout.Padding = UDim.new(0, 6)
+    
+    local SidebarPadding = Instance.new("UIPadding", Sidebar)
+    SidebarPadding.PaddingTop = UDim.new(0, 6)
+    SidebarPadding.PaddingLeft = UDim.new(0, 6)
 
-    -- Контейнер для содержимого
-    local Container = Instance.new("Frame", MainFrame)
-    Container.Size = UDim2.new(0.75, 0, 0.88, 0)
-    Container.Position = UDim2.new(0, 0, 0.12, 0)
-    Container.BackgroundTransparency = 1
+    SidebarLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        Sidebar.CanvasSize = UDim2.new(0, 0, 0, SidebarLayout.AbsoluteContentSize.Y + 10)
+    end)
 
-    -- Скрытие / открытие UI по клавише
-    UserInputService.InputBegan:Connect(function(input, gpe)
-        if not gpe and input.KeyCode == Library.ToggleKey then
+    -- Левая рабочая область (Контент вкладок)
+    local ContentArea = Instance.new("Frame", MainFrame)
+    ContentArea.Size = UDim2.new(0.72, 0, 0.88, 0)
+    ContentArea.Position = UDim2.new(0, 0, 0.12, 0)
+    ContentArea.BackgroundTransparency = 1
+
+    -- Бинд на скрытие GUI
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if not gameProcessed and input.KeyCode == Library.ToggleKey then
             MainFrame.Visible = not MainFrame.Visible
         end
     end)
 
-    local Window = { Tabs = {} }
+    local Window = { CurrentTab = nil, ThemeElements = {} }
 
-    -- Функция добавления вкладки
-    function Window:CreateTab(name)
+    -- Добавление вкладок
+    function Window:CreateTab(Name)
         local TabBtn = Instance.new("TextButton", Sidebar)
-        TabBtn.Size = UDim2.new(0.9, 0, 0, 35)
-        TabBtn.Text = name
+        TabBtn.Size = UDim2.new(0.92, 0, 0, 32)
+        TabBtn.Text = Name
         TabBtn.BackgroundColor3 = Library.Themes[Library.CurrentTheme].Element
         TabBtn.TextColor3 = Library.Themes[Library.CurrentTheme].Text
         TabBtn.Font = Enum.Font.Gotham
+        TabBtn.TextSize = 13
 
-        local Page = Instance.new("ScrollingFrame", Container)
+        local TabCorner = Instance.new("UICorner", TabBtn)
+        TabCorner.CornerRadius = UDim.new(0, 6)
+
+        local Page = Instance.new("ScrollingFrame", ContentArea)
         Page.Size = UDim2.new(1, 0, 1, 0)
-        Page.Visible = false
         Page.BackgroundTransparency = 1
-        Page.ScrollBarThickness = 4
+        Page.Visible = false
+        Page.ScrollBarThickness = 3
+        Page.CanvasSize = UDim2.new(0, 0, 0, 0)
 
         local PageLayout = Instance.new("UIListLayout", Page)
         PageLayout.Padding = UDim.new(0, 8)
+        
+        local PagePadding = Instance.new("UIPadding", Page)
+        PagePadding.PaddingTop = UDim.new(0, 8)
+        PagePadding.PaddingLeft = UDim.new(0, 10)
+
+        PageLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+            Page.CanvasSize = UDim2.new(0, 0, 0, PageLayout.AbsoluteContentSize.Y + 15)
+        end)
 
         TabBtn.MouseButton1Click:Connect(function()
-            for _, child in pairs(Container:GetChildren()) do
+            for _, child in pairs(ContentArea:GetChildren()) do
                 if child:IsA("ScrollingFrame") then child.Visible = false end
             end
             Page.Visible = true
         end)
 
-        local TabElements = {}
-
-        -- 1. Переключатель (Toggle) без бинда
-        function TabElements:CreateToggle(text, default, callback)
-            local state = default or false
-            local ToggleBtn = Instance.new("TextButton", Page)
-            ToggleBtn.Size = UDim2.new(0.95, 0, 0, 40)
-            ToggleBtn.Text = text .. ": " .. (state and "ON" or "OFF")
-            ToggleBtn.BackgroundColor3 = Library.Themes[Library.CurrentTheme].Element
-            ToggleBtn.TextColor3 = Library.Themes[Library.CurrentTheme].Text
-            
-            ToggleBtn.MouseButton1Click:Connect(function()
-                state = not state
-                ToggleBtn.Text = text .. ": " .. (state and "ON" or "OFF")
-                pcall(callback, state)
-            end)
+        if not Window.CurrentTab then
+            Window.CurrentTab = Page
+            Page.Visible = true
         end
 
-        -- 2. Переключатель с биндом (Keybind Toggle)
-        function TabElements:CreateKeybindToggle(text, defaultKey, callback)
-            local currentKey = defaultKey or Enum.KeyCode.E
-            local state = false
-            
-            local KeybindBtn = Instance.new("TextButton", Page)
-            KeybindBtn.Size = UDim2.new(0.95, 0, 0, 40)
-            KeybindBtn.Text = text .. " [" .. currentKey.Name .. "]: OFF"
-            KeybindBtn.BackgroundColor3 = Library.Themes[Library.CurrentTheme].Element
-            KeybindBtn.TextColor3 = Library.Themes[Library.CurrentTheme].Text
+        local Elements = {}
 
-            KeybindBtn.MouseButton1Click:Connect(function()
-                state = not state
-                KeybindBtn.Text = text .. " [" .. currentKey.Name .. "]: " .. (state and "ON" or "OFF")
-                pcall(callback, state)
+        -- 1. Кнопка с биндом клавиши
+        function Elements:CreateKeybindToggle(Name, DefaultKey, Callback)
+            local Enabled = false
+            local Key = DefaultKey or Enum.KeyCode.E
+            local Binding = false
+
+            local Frame = Instance.new("Frame", Page)
+            Frame.Size = UDim2.new(0.95, 0, 0, 40)
+            Frame.BackgroundColor3 = Library.Themes[Library.CurrentTheme].Element
+
+            local Corner = Instance.new("UICorner", Frame)
+            Corner.CornerRadius = UDim.new(0, 6)
+
+            local ToggleBtn = Instance.new("TextButton", Frame)
+            ToggleBtn.Size = UDim2.new(0.65, 0, 1, 0)
+            ToggleBtn.BackgroundTransparency = 1
+            ToggleBtn.Text = Name .. ": OFF"
+            ToggleBtn.TextColor3 = Library.Themes[Library.CurrentTheme].Text
+            ToggleBtn.Font = Enum.Font.Gotham
+            ToggleBtn.TextSize = 12
+            ToggleBtn.TextXAlignment = Enum.TextXAlignment.Left
+
+            local BindBtn = Instance.new("TextButton", Frame)
+            BindBtn.Size = UDim2.new(0.3, 0, 0.7, 0)
+            BindBtn.Position = UDim2.new(0.67, 0, 0.15, 0)
+            BindBtn.Text = "[" .. Key.Name .. "]"
+            BindBtn.BackgroundColor3 = Library.Themes[Library.CurrentTheme].Sidebar
+            BindBtn.TextColor3 = Library.Themes[Library.CurrentTheme].Text
+            BindBtn.Font = Enum.Font.GothamBold
+            BindBtn.TextSize = 11
+
+            local BindCorner = Instance.new("UICorner", BindBtn)
+            BindCorner.CornerRadius = UDim.new(0, 4)
+
+            local function Fire(val)
+                Enabled = val
+                ToggleBtn.Text = Name .. ": " .. (Enabled and "ON" or "OFF")
+                ToggleBtn.TextColor3 = Enabled and Library.Themes[Library.CurrentTheme].Accent or Library.Themes[Library.CurrentTheme].Text
+                pcall(Callback, Enabled)
+            end
+
+            ToggleBtn.MouseButton1Click:Connect(function()
+                Fire(not Enabled)
+            end)
+
+            BindBtn.MouseButton1Click:Connect(function()
+                BindBtn.Text = "[...]"
+                Binding = true
             end)
 
             UserInputService.InputBegan:Connect(function(input, gpe)
-                if not gpe and input.KeyCode == currentKey then
-                    state = not state
-                    KeybindBtn.Text = text .. " [" .. currentKey.Name .. "]: " .. (state and "ON" or "OFF")
-                    pcall(callback, state)
+                if gpe then return end
+                if Binding and input.UserInputType == Enum.UserInputType.Keyboard then
+                    Key = input.KeyCode
+                    BindBtn.Text = "[" .. Key.Name .. "]"
+                    Binding = false
+                elseif not Binding and input.KeyCode == Key then
+                    Fire(not Enabled)
                 end
             end)
         end
 
-        -- 3. Ползунок (Slider)
-        function TabElements:CreateSlider(text, min, max, default, callback)
-            local value = default or min
+        -- 2. Обычный Тоггл (без бинда)
+        function Elements:CreateToggle(Name, Default, Callback)
+            local Enabled = Default or false
+
+            local Btn = Instance.new("TextButton", Page)
+            Btn.Size = UDim2.new(0.95, 0, 0, 36)
+            Btn.BackgroundColor3 = Library.Themes[Library.CurrentTheme].Element
+            Btn.Text = Name .. ": " .. (Enabled and "ON" or "OFF")
+            Btn.TextColor3 = Enabled and Library.Themes[Library.CurrentTheme].Accent or Library.Themes[Library.CurrentTheme].Text
+            Btn.Font = Enum.Font.Gotham
+            Btn.TextSize = 12
+
+            local Corner = Instance.new("UICorner", Btn)
+            Corner.CornerRadius = UDim.new(0, 6)
+
+            Btn.MouseButton1Click:Connect(function()
+                Enabled = not Enabled
+                Btn.Text = Name .. ": " .. (Enabled and "ON" or "OFF")
+                Btn.TextColor3 = Enabled and Library.Themes[Library.CurrentTheme].Accent or Library.Themes[Library.CurrentTheme].Text
+                pcall(Callback, Enabled)
+            end)
+        end
+
+        -- 3. Ползунок (Slider) с настройкой Min/Max
+        function Elements:CreateSlider(Name, Min, Max, Default, Callback)
+            local Value = math.clamp(Default or Min, Min, Max)
+            local Dragging = false
+
             local SliderFrame = Instance.new("Frame", Page)
-            SliderFrame.Size = UDim2.new(0.95, 0, 0, 50)
+            SliderFrame.Size = UDim2.new(0.95, 0, 0, 45)
             SliderFrame.BackgroundColor3 = Library.Themes[Library.CurrentTheme].Element
 
-            local Label = Instance.new("TextLabel", SliderFrame)
-            Label.Size = UDim2.new(1, 0, 0.5, 0)
-            Label.Text = text .. ": " .. tostring(value)
-            Label.TextColor3 = Library.Themes[Library.CurrentTheme].Text
-            Label.BackgroundTransparency = 1
+            local Corner = Instance.new("UICorner", SliderFrame)
+            Corner.CornerRadius = UDim.new(0, 6)
 
-            -- Логика перетаскивания ползунка (упрощенная)
-            SliderFrame.InputBegan:Connect(function(input)
+            local Label = Instance.new("TextLabel", SliderFrame)
+            Label.Size = UDim2.new(1, -10, 0, 20)
+            Label.Position = UDim2.new(0, 8, 0, 2)
+            Label.Text = Name .. ": " .. tostring(Value)
+            Label.TextColor3 = Library.Themes[Library.CurrentTheme].Text
+            Label.Font = Enum.Font.Gotham
+            Label.TextSize = 11
+            Label.BackgroundTransparency = 1
+            Label.TextXAlignment = Enum.TextXAlignment.Left
+
+            local Track = Instance.new("Frame", SliderFrame)
+            Track.Size = UDim2.new(0.9, 0, 0, 6)
+            Track.Position = UDim2.new(0.05, 0, 0.68, 0)
+            Track.BackgroundColor3 = Library.Themes[Library.CurrentTheme].Sidebar
+
+            local TrackCorner = Instance.new("UICorner", Track)
+            TrackCorner.CornerRadius = UDim.new(1, 0)
+
+            local Fill = Instance.new("Frame", Track)
+            Fill.Size = UDim2.new((Value - Min) / (Max - Min), 0, 1, 0)
+            Fill.BackgroundColor3 = Library.Themes[Library.CurrentTheme].Accent
+
+            local FillCorner = Instance.new("UICorner", Fill)
+            FillCorner.CornerRadius = UDim.new(1, 0)
+
+            local function Update(input)
+                local pos = math.clamp((input.Position.X - Track.AbsolutePosition.X) / Track.AbsoluteSize.X, 0, 1)
+                Value = math.floor(Min + ((Max - Min) * pos))
+                Fill.Size = UDim2.new(pos, 0, 1, 0)
+                Label.Text = Name .. ": " .. tostring(Value)
+                pcall(Callback, Value)
+            end
+
+            Track.InputBegan:Connect(function(input)
                 if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                    -- Расчет значения на основе позиции
-                    value = math.clamp(math.floor(min + (max - min) * 0.5), min, max)
-                    Label.Text = text .. ": " .. tostring(value)
-                    pcall(callback, value)
+                    Dragging = true
+                    Update(input)
+                end
+            end)
+
+            UserInputService.InputEnded:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                    Dragging = false
+                end
+            end)
+
+            UserInputService.InputChanged:Connect(function(input)
+                if Dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                    Update(input)
                 end
             end)
         end
 
-        -- 4. Выпадающий список (Dropdown)
-        function TabElements:CreateDropdown(text, options, multiSelect, callback)
-            local selected = {}
-            local DropdownBtn = Instance.new("TextButton", Page)
-            DropdownBtn.Size = UDim2.new(0.95, 0, 0, 40)
-            DropdownBtn.Text = text .. " (Select)"
-            DropdownBtn.BackgroundColor3 = Library.Themes[Library.CurrentTheme].Element
-            DropdownBtn.TextColor3 = Library.Themes[Library.CurrentTheme].Text
+        -- 4. Выпадающий список (Multi-Select или Single-Select)
+        function Elements:CreateDropdown(Name, Options, MultiSelect, Callback)
+            local Selected = {}
+            local Expanded = false
 
-            -- Внутренняя логика показа вариантов и выбора
-            DropdownBtn.MouseButton1Click:Connect(function()
-                -- Переключение видимости списка опций
+            local DropFrame = Instance.new("Frame", Page)
+            DropFrame.Size = UDim2.new(0.95, 0, 0, 36)
+            DropFrame.BackgroundColor3 = Library.Themes[Library.CurrentTheme].Element
+            DropFrame.ClipsDescendants = true
+
+            local Corner = Instance.new("UICorner", DropFrame)
+            Corner.CornerRadius = UDim.new(0, 6)
+
+            local DropBtn = Instance.new("TextButton", DropFrame)
+            DropBtn.Size = UDim2.new(1, 0, 0, 36)
+            DropBtn.BackgroundTransparency = 1
+            DropBtn.Text = Name .. " [Выбрать]"
+            DropBtn.TextColor3 = Library.Themes[Library.CurrentTheme].Text
+            DropBtn.Font = Enum.Font.Gotham
+            DropBtn.TextSize = 12
+
+            local Container = Instance.new("Frame", DropFrame)
+            Container.Size = UDim2.new(1, 0, 0, #Options * 28)
+            Container.Position = UDim2.new(0, 0, 0, 36)
+            Container.BackgroundTransparency = 1
+
+            local ListLayout = Instance.new("UIListLayout", Container)
+            ListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+            local function RefreshText()
+                local str = {}
+                for k, v in pairs(Selected) do
+                    if v then table.insert(str, k) end
+                end
+                DropBtn.Text = Name .. " [" .. (#str > 0 and table.concat(str, ", ") or "None") .. "]"
+            end
+
+            for _, opt in ipairs(Options) do
+                local OptBtn = Instance.new("TextButton", Container)
+                OptBtn.Size = UDim2.new(1, 0, 0, 28)
+                OptBtn.BackgroundColor3 = Library.Themes[Library.CurrentTheme].Sidebar
+                OptBtn.Text = opt
+                OptBtn.TextColor3 = Library.Themes[Library.CurrentTheme].Text
+                OptBtn.Font = Enum.Font.Gotham
+                OptBtn.TextSize = 11
+
+                OptBtn.MouseButton1Click:Connect(function()
+                    if MultiSelect then
+                        Selected[opt] = not Selected[opt]
+                        OptBtn.TextColor3 = Selected[opt] and Library.Themes[Library.CurrentTheme].Accent or Library.Themes[Library.CurrentTheme].Text
+                    else
+                        Selected = { [opt] = true }
+                        for _, child in pairs(Container:GetChildren()) do
+                            if child:IsA("TextButton") then
+                                child.TextColor3 = Library.Themes[Library.CurrentTheme].Text
+                            end
+                        end
+                        OptBtn.TextColor3 = Library.Themes[Library.CurrentTheme].Accent
+                    end
+                    RefreshText()
+                    pcall(Callback, Selected)
+                end)
+            end
+
+            DropBtn.MouseButton1Click:Connect(function()
+                Expanded = not Expanded
+                DropFrame.Size = Expanded and UDim2.new(0.95, 0, 0, 36 + (#Options * 28)) or UDim2.new(0.95, 0, 0, 36)
             end)
         end
 
-        return TabElements
+        return Elements
     end
+
+    -- Вкладка настроек (Переключение тем и клавиши гида)
+    SettingsBtn.MouseButton1Click:Connect(function()
+        local SettingsWindow = Instance.new("Frame", MainFrame)
+        SettingsWindow.Size = UDim2.new(0.8, 0, 0.8, 0)
+        SettingsWindow.Position = UDim2.new(0.1, 0, 0.1, 0)
+        SettingsWindow.BackgroundColor3 = Library.Themes[Library.CurrentTheme].Sidebar
+        SettingsWindow.ZIndex = 10
+
+        local Corner = Instance.new("UICorner", SettingsWindow)
+        Corner.CornerRadius = UDim.new(0, 8)
+
+        local CloseBtn = Instance.new("TextButton", SettingsWindow)
+        CloseBtn.Size = UDim2.new(0.2, 0, 0.15, 0)
+        CloseBtn.Position = UDim2.new(0.75, 0, 0.05, 0)
+        CloseBtn.Text = "X"
+        CloseBtn.BackgroundColor3 = Library.Themes[Library.CurrentTheme].Element
+        CloseBtn.TextColor3 = Library.Themes[Library.CurrentTheme].Text
+        CloseBtn.ZIndex = 11
+
+        CloseBtn.MouseButton1Click:Connect(function()
+            SettingsWindow:Destroy()
+        end)
+
+        local ThemeBtn = Instance.new("TextButton", SettingsWindow)
+        ThemeBtn.Size = UDim2.new(0.8, 0, 0.25, 0)
+        ThemeBtn.Position = UDim2.new(0.1, 0, 0.3, 0)
+        ThemeBtn.Text = "Тема: " .. Library.CurrentTheme
+        ThemeBtn.BackgroundColor3 = Library.Themes[Library.CurrentTheme].Element
+        ThemeBtn.TextColor3 = Library.Themes[Library.CurrentTheme].Text
+        ThemeBtn.ZIndex = 11
+
+        ThemeBtn.MouseButton1Click:Connect(function()
+            Library.CurrentTheme = (Library.CurrentTheme == "Dark") and "Light" or "Dark"
+            ThemeBtn.Text = "Тема: " .. Library.CurrentTheme
+            SaveConfig({ Theme = Library.CurrentTheme, ToggleKey = Library.ToggleKey.Name })
+        end)
+    end)
 
     return Window
 end
