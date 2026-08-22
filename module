@@ -1,4 +1,4 @@
--- Название модуля: UIFramework (или как хочешь)
+-- Название модуля: UIFramework
 local UIFramework = {}
 
 -- Конфиг для красоты
@@ -22,19 +22,19 @@ local function createMainFrame(title)
     local mainFrame = Instance.new("Frame")
     mainFrame.Name = "MainFrame"
     mainFrame.Size = UDim2.new(0, 600, 0, 400)
-    mainFrame.Position = UDim2.new(0.5, -300, 0.5, -200) -- По центру
+    mainFrame.Position = UDim2.new(0.5, -300, 0.5, -200)
     mainFrame.BackgroundColor3 = COLORS.Background
     mainFrame.BackgroundTransparency = 0
     mainFrame.BorderSizePixel = 0
     mainFrame.ClipsDescendants = true
     mainFrame.Parent = screenGui
     
-    -- Скругление углов (UIStroke для современного вида)
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 8)
-    corner.Parent = mainFrame
+    -- Скругление углов (единое для всего mainFrame)
+    local mainCorner = Instance.new("UICorner")
+    mainCorner.CornerRadius = UDim.new(0, 8)
+    mainCorner.Parent = mainFrame
     
-    -- Тень (лёгкая, через прозрачный фрейм)
+    -- Тень
     local shadow = Instance.new("Frame")
     shadow.Size = UDim2.new(1, 0, 1, 0)
     shadow.Position = UDim2.new(0, 8, 0, 8)
@@ -57,10 +57,6 @@ local function createMainFrame(title)
     topBar.BorderSizePixel = 0
     topBar.Parent = mainFrame
     
-    local topCorner = Instance.new("UICorner")
-    topCorner.CornerRadius = UDim.new(0, 8)
-    topCorner.Parent = topBar
-    
     -- Заголовок
     local titleLabel = Instance.new("TextLabel")
     titleLabel.Size = UDim2.new(1, -50, 1, 0)
@@ -73,7 +69,7 @@ local function createMainFrame(title)
     titleLabel.Font = Enum.Font.GothamBold
     titleLabel.Parent = topBar
     
-    -- Кнопка закрытия (опционально, но пригодится)
+    -- Кнопка закрытия
     local closeBtn = Instance.new("TextButton")
     closeBtn.Size = UDim2.new(0, 30, 0, 30)
     closeBtn.Position = UDim2.new(1, -36, 0, 3)
@@ -87,7 +83,7 @@ local function createMainFrame(title)
         mainFrame.Visible = false
     end)
     
-    -- Основной контейнер (делит окно на левую и правую часть)
+    -- Основной контейнер
     local container = Instance.new("Frame")
     container.Name = "Container"
     container.Size = UDim2.new(1, 0, 1, -36)
@@ -95,7 +91,7 @@ local function createMainFrame(title)
     container.BackgroundTransparency = 1
     container.Parent = mainFrame
     
-    -- ЛЕВАЯ ПАНЕЛЬ (вкладки)
+    -- ЛЕВАЯ ПАНЕЛЬ
     local leftPanel = Instance.new("Frame")
     leftPanel.Name = "LeftPanel"
     leftPanel.Size = UDim2.new(0, 180, 1, 0)
@@ -104,18 +100,28 @@ local function createMainFrame(title)
     leftPanel.BorderSizePixel = 0
     leftPanel.Parent = container
     
+    -- Скругление для левой панели (только левые углы)
     local leftCorner = Instance.new("UICorner")
-    leftCorner.CornerRadius = UDim.new(0, 0) -- Слева углы не скругляем, чтобы стык был ровный
+    leftCorner.CornerRadius = UDim.new(0, 8)
     leftCorner.Parent = leftPanel
     
-    -- Скроллинг для левой панели (если вкладок будет много)
+    -- Маскируем правые углы левой панели (чтобы не перекрывали правую)
+    local leftMask = Instance.new("Frame")
+    leftMask.Size = UDim2.new(0, 8, 1, 0)
+    leftMask.Position = UDim2.new(1, -8, 0, 0)
+    leftMask.BackgroundColor3 = leftPanel.BackgroundColor3
+    leftMask.BackgroundTransparency = 0
+    leftMask.BorderSizePixel = 0
+    leftMask.Parent = leftPanel
+    
+    -- Скроллинг для левой панели
     local leftScrolling = Instance.new("ScrollingFrame")
     leftScrolling.Size = UDim2.new(1, 0, 1, 0)
     leftScrolling.BackgroundTransparency = 1
     leftScrolling.BorderSizePixel = 0
     leftScrolling.ScrollBarThickness = 4
     leftScrolling.ScrollBarImageColor3 = COLORS.Accent
-    leftScrolling.CanvasSize = UDim2.new(0, 0, 0, 0) -- Будет расширяться динамически
+    leftScrolling.CanvasSize = UDim2.new(0, 0, 0, 0)
     leftScrolling.Parent = leftPanel
     
     local leftLayout = Instance.new("UIListLayout")
@@ -123,7 +129,7 @@ local function createMainFrame(title)
     leftLayout.SortOrder = Enum.SortOrder.LayoutOrder
     leftLayout.Parent = leftScrolling
     
-    -- ПРАВАЯ ПАНЕЛЬ (контент)
+    -- ПРАВАЯ ПАНЕЛЬ
     local rightPanel = Instance.new("Frame")
     rightPanel.Name = "RightPanel"
     rightPanel.Size = UDim2.new(1, -180, 1, 0)
@@ -133,11 +139,21 @@ local function createMainFrame(title)
     rightPanel.BorderSizePixel = 0
     rightPanel.Parent = container
     
+    -- Скругление для правой панели (только правые углы)
     local rightCorner = Instance.new("UICorner")
-    rightCorner.CornerRadius = UDim.new(0, 0) -- Справа тоже ровный стык
+    rightCorner.CornerRadius = UDim.new(0, 8)
     rightCorner.Parent = rightPanel
     
-    -- Контейнер для страниц (все страницы лежат тут, но видна только одна)
+    -- Маскируем левые углы правой панели
+    local rightMask = Instance.new("Frame")
+    rightMask.Size = UDim2.new(0, 8, 1, 0)
+    rightMask.Position = UDim2.new(0, 0, 0, 0)
+    rightMask.BackgroundColor3 = rightPanel.BackgroundColor3
+    rightMask.BackgroundTransparency = 0
+    rightMask.BorderSizePixel = 0
+    rightMask.Parent = rightPanel
+    
+    -- Контейнер для страниц
     local pagesContainer = Instance.new("Frame")
     pagesContainer.Name = "PagesContainer"
     pagesContainer.Size = UDim2.new(1, 0, 1, 0)
@@ -148,10 +164,9 @@ local function createMainFrame(title)
     local pages = {}
     local activePage = nil
     
-    -- === ФУНКЦИИ ДЛЯ РАБОТЫ С МОДУЛЕМ ===
+    -- === ФУНКЦИИ ===
     
-    -- Создание новой страницы (вкладки)
-    function UIFramework:CreatePage(name, icon)
+    function UIFramework:CreatePage(name)
         local pageFrame = Instance.new("Frame")
         pageFrame.Name = name
         pageFrame.Size = UDim2.new(1, 0, 1, 0)
@@ -159,13 +174,11 @@ local function createMainFrame(title)
         pageFrame.Visible = false
         pageFrame.Parent = pagesContainer
         
-        -- UIListLayout для контента на странице (чтобы удобно добавлять элементы)
         local pageLayout = Instance.new("UIListLayout")
         pageLayout.Padding = UDim.new(0, 8)
         pageLayout.SortOrder = Enum.SortOrder.LayoutOrder
         pageLayout.Parent = pageFrame
         
-        -- Кнопка в левой панели
         local tabBtn = Instance.new("TextButton")
         tabBtn.Name = name .. "Tab"
         tabBtn.Size = UDim2.new(1, -12, 0, 36)
@@ -185,39 +198,18 @@ local function createMainFrame(title)
         tabCorner.CornerRadius = UDim.new(0, 4)
         tabCorner.Parent = tabBtn
         
-        -- Иконка слева от текста (если передана)
-        if icon then
-            local iconLabel = Instance.new("TextLabel")
-            iconLabel.Size = UDim2.new(0, 24, 1, 0)
-            iconLabel.Position = UDim2.new(0, 6, 0, 0)
-            iconLabel.BackgroundTransparency = 1
-            iconLabel.Text = icon
-            iconLabel.TextColor3 = COLORS.TextDim
-            iconLabel.TextSize = 16
-            iconLabel.TextXAlignment = Enum.TextXAlignment.Center
-            iconLabel.Font = Enum.Font.GothamBold
-            iconLabel.Parent = tabBtn
-            
-            -- Сдвигаем текст вправо
-            tabBtn.Text = "   " .. name
-        end
-        
-        -- Обновляем CanvasSize для скролла
         leftScrolling.CanvasSize = UDim2.new(0, 0, 0, leftScrolling.CanvasSize.Y.Offset + 40)
         
-        -- Клик по вкладке
         tabBtn.MouseButton1Click:Connect(function()
             UIFramework:SwitchPage(name)
         end)
         
-        -- Сохраняем
         pages[name] = {
             Frame = pageFrame,
             Button = tabBtn,
             Layout = pageLayout
         }
         
-        -- Если это первая страница - делаем активной
         if not activePage then
             UIFramework:SwitchPage(name)
         end
@@ -225,25 +217,22 @@ local function createMainFrame(title)
         return pageFrame, pageLayout
     end
     
-    -- Переключение страницы
     function UIFramework:SwitchPage(name)
         if not pages[name] then return end
         
-        -- Прячем все страницы
         for _, data in pairs(pages) do
             data.Frame.Visible = false
             data.Button.BackgroundColor3 = COLORS.TabInactive
             data.Button.TextColor3 = COLORS.TextDim
         end
         
-        -- Показываем нужную
         pages[name].Frame.Visible = true
         pages[name].Button.BackgroundColor3 = COLORS.TabActive
         pages[name].Button.TextColor3 = COLORS.Text
         activePage = name
     end
     
-    -- Перетаскивание окна
+    -- Перетаскивание
     local dragging = false
     local dragStart, startPos
     
@@ -271,7 +260,6 @@ local function createMainFrame(title)
         end
     end)
     
-    -- Возвращаем всё необходимое
     return {
         MainFrame = mainFrame,
         TopBar = topBar,
@@ -285,7 +273,6 @@ local function createMainFrame(title)
     }
 end
 
--- Главная функция модуля
 function UIFramework.New(title)
     return createMainFrame(title or "UI Framework")
 end
