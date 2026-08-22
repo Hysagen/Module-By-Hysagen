@@ -1,28 +1,6 @@
 --[[
     UI Module for Roblox Scripts
-    Version 1.0
-    Usage:
-        local UI = loadstring(game:HttpGet("..."))()
-        local myUI = UI.new({
-            Name = "My Script GUI",
-            Tabs = {
-                {
-                    Name = "Main",
-                    Elements = {
-                        { Type = "Toggle", Name = "Auto Farm", Bind = "F", Default = false, Callback = function(v) print("Auto Farm:", v) end },
-                        { Type = "Button", Name = "Click Me", Callback = function() print("Clicked") end },
-                        { Type = "Slider", Name = "Speed", Min = 0, Max = 100, Default = 50, Callback = function(v) print("Speed:", v) end },
-                        { Type = "Dropdown", Name = "Mode", Options = {"Easy", "Normal", "Hard"}, Default = "Normal", Multi = false, Callback = function(v) print("Mode:", v) end },
-                    }
-                },
-                -- more tabs...
-            },
-            Settings = {
-                Theme = "Dark",          -- optional
-                ToggleKey = "RightControl", -- optional
-                SizeRatio = "3:4"        -- optional
-            }
-        })
+    Version 1.1 (исправлена ошибка с метатаблицей)
 ]]
 
 local UIModule = {}
@@ -144,50 +122,40 @@ function UIModule.new(config)
         saveSettings(settings)
     end
 
-    local self = setmetatable({}, UIModule)
+    -- Исправленная метатаблица для доступа к методам
+    local self = setmetatable({}, { __index = UIModule })
     self.config = config
     self.settings = settings
-    self.tabs = {}          -- name -> {elements = {}}
-    self.tabButtons = {}    -- name -> TextButton
-    self.tabPanels = {}     -- name -> ScrollingFrame
-    self.elements = {}      -- name -> list of element objects
+    self.tabs = {}
+    self.tabButtons = {}
+    self.tabPanels = {}
+    self.elements = {}
     self.currentTab = nil
     self.visible = true
     self.toggleConnection = nil
     self.theme = settings.Theme
     self.isMobile = UserInputService.TouchEnabled
 
-    -- Create GUI
-    self:createGUI()
+    -- Устанавливаем тему до создания элементов
+    self.themeData = Themes[self.theme] or Themes.Dark
 
-    -- Add tabs from config
+    self:createGUI()
     if config.Tabs then
         for _, tabData in ipairs(config.Tabs) do
             self:addTab(tabData.Name, tabData.Elements)
         end
     end
-
-    -- Add Settings tab if not exists
     if not self.tabs["Settings"] then
         self:addSettingsTab()
     end
-
-    -- Select first tab
     local firstTab = next(self.tabs)
     if firstTab then
         self:selectTab(firstTab)
     end
-
-    -- Setup toggle key
     self:setupToggleKey()
-
-    -- Apply theme
     self:applyTheme(self.theme)
-
-    -- Make sure it's visible
     self:setVisible(true)
 
-    -- Cleanup on player leaving
     self.gui.AncestryChanged:Connect(function()
         if not self.gui.Parent then
             self:destroy()
@@ -206,7 +174,7 @@ function UIModule:createGUI()
     local mainFrame = Instance.new("Frame")
     mainFrame.Name = "MainFrame"
     mainFrame.Parent = gui
-    mainFrame.BackgroundColor3 = Color3.fromRGB(30,30,30)
+    mainFrame.BackgroundColor3 = self.themeData.Background
     mainFrame.BackgroundTransparency = 0
     mainFrame.BorderSizePixel = 0
     mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
@@ -218,11 +186,10 @@ function UIModule:createGUI()
     aspect.Parent = mainFrame
     aspect.AspectRatio = parseRatio(self.settings.SizeRatio)
 
-    -- Title Bar
     local titleBar = Instance.new("Frame")
     titleBar.Name = "TitleBar"
     titleBar.Parent = mainFrame
-    titleBar.BackgroundColor3 = Color3.fromRGB(40,40,40)
+    titleBar.BackgroundColor3 = self.themeData.TabSelected
     titleBar.BackgroundTransparency = 0
     titleBar.BorderSizePixel = 0
     titleBar.Size = UDim2.new(1, 0, 0, 40)
@@ -231,7 +198,7 @@ function UIModule:createGUI()
     titleLabel.Parent = titleBar
     titleLabel.BackgroundTransparency = 1
     titleLabel.Text = self.config.Name or "GUI"
-    titleLabel.TextColor3 = Color3.fromRGB(255,255,255)
+    titleLabel.TextColor3 = self.themeData.Text
     titleLabel.TextSize = 18
     titleLabel.Font = Enum.Font.GothamBold
     titleLabel.Position = UDim2.new(0.05, 0, 0, 0)
@@ -242,7 +209,7 @@ function UIModule:createGUI()
     closeButton.Parent = titleBar
     closeButton.BackgroundTransparency = 1
     closeButton.Text = "✕"
-    closeButton.TextColor3 = Color3.fromRGB(255,255,255)
+    closeButton.TextColor3 = self.themeData.Text
     closeButton.TextSize = 18
     closeButton.Font = Enum.Font.GothamBold
     closeButton.Position = UDim2.new(0.95, -30, 0, 0)
@@ -251,11 +218,10 @@ function UIModule:createGUI()
         self:toggleVisibility()
     end)
 
-    -- Tabs Panel (right side)
     local tabsPanel = Instance.new("ScrollingFrame")
     tabsPanel.Name = "TabsPanel"
     tabsPanel.Parent = mainFrame
-    tabsPanel.BackgroundColor3 = Color3.fromRGB(40,40,40)
+    tabsPanel.BackgroundColor3 = self.themeData.Panel
     tabsPanel.BackgroundTransparency = 0
     tabsPanel.BorderSizePixel = 0
     tabsPanel.Size = UDim2.new(0, 160, 1, -40)
@@ -264,11 +230,10 @@ function UIModule:createGUI()
     tabsPanel.ScrollBarThickness = 6
     tabsPanel.AutomaticCanvasSize = Enum.AutomaticSize.Y
 
-    -- Content Panel
     local contentPanel = Instance.new("Frame")
     contentPanel.Name = "ContentPanel"
     contentPanel.Parent = mainFrame
-    contentPanel.BackgroundColor3 = Color3.fromRGB(35,35,35)
+    contentPanel.BackgroundColor3 = self.themeData.Panel
     contentPanel.BackgroundTransparency = 0
     contentPanel.BorderSizePixel = 0
     contentPanel.Size = UDim2.new(1, -160, 1, -40)
@@ -284,21 +249,19 @@ function UIModule:createGUI()
     self.closeButton = closeButton
 end
 
--- ============ Tab Management ============
 function UIModule:addTab(name, elements)
     if self.tabs[name] then return end
     self.tabs[name] = { elements = {} }
     self.elements[name] = {}
 
-    -- Tab button
     local btn = Instance.new("TextButton")
     btn.Name = "Tab_"..name
     btn.Parent = self.tabsPanel
-    btn.BackgroundColor3 = Color3.fromRGB(50,50,50)
+    btn.BackgroundColor3 = self.themeData.Tab
     btn.BackgroundTransparency = 0
     btn.BorderSizePixel = 0
     btn.Text = name
-    btn.TextColor3 = Color3.fromRGB(255,255,255)
+    btn.TextColor3 = self.themeData.Text
     btn.TextSize = 16
     btn.Font = Enum.Font.Gotham
     btn.Size = UDim2.new(1, 0, 0, 40)
@@ -307,10 +270,8 @@ function UIModule:addTab(name, elements)
     btn.MouseButton1Click:Connect(function()
         self:selectTab(name)
     end)
-
     self.tabButtons[name] = btn
 
-    -- Panel (ScrollingFrame) for content
     local panel = Instance.new("ScrollingFrame")
     panel.Name = "Panel_"..name
     panel.Parent = self.contentPanel
@@ -322,10 +283,8 @@ function UIModule:addTab(name, elements)
     panel.ScrollBarThickness = 6
     panel.AutomaticCanvasSize = Enum.AutomaticSize.Y
     panel.Visible = false
-
     self.tabPanels[name] = panel
 
-    -- Add elements
     if elements then
         for _, elemData in ipairs(elements) do
             self:addElement(name, elemData)
@@ -335,12 +294,10 @@ end
 
 function UIModule:selectTab(name)
     if self.currentTab == name then return end
-    -- Hide previous
     if self.currentTab and self.tabPanels[self.currentTab] then
         self.tabPanels[self.currentTab].Visible = false
         self.tabButtons[self.currentTab].BackgroundColor3 = self.themeData.Tab
     end
-    -- Show selected
     self.currentTab = name
     if name and self.tabPanels[name] then
         self.tabPanels[name].Visible = true
@@ -348,7 +305,6 @@ function UIModule:selectTab(name)
     end
 end
 
--- ============ Elements ============
 function UIModule:addElement(tabName, elemData)
     local panel = self.tabPanels[tabName]
     if not panel then return end
@@ -366,12 +322,10 @@ function UIModule:addElement(tabName, elemData)
 
     if element then
         table.insert(self.elements[tabName], element)
-        -- apply current theme
         self:applyThemeToElement(element)
     end
 end
 
--- ============ Toggle ============
 function UIModule:createToggle(parent, data)
     local frame = Instance.new("Frame")
     frame.Parent = parent
@@ -383,7 +337,7 @@ function UIModule:createToggle(parent, data)
     label.Parent = frame
     label.BackgroundTransparency = 1
     label.Text = data.Name
-    label.TextColor3 = Color3.fromRGB(255,255,255)
+    label.TextColor3 = self.themeData.Text
     label.TextSize = 16
     label.Font = Enum.Font.Gotham
     label.TextXAlignment = Enum.TextXAlignment.Left
@@ -392,18 +346,17 @@ function UIModule:createToggle(parent, data)
 
     local toggleBtn = Instance.new("TextButton")
     toggleBtn.Parent = frame
-    toggleBtn.BackgroundColor3 = Color3.fromRGB(80,80,80)
+    toggleBtn.BackgroundColor3 = self.themeData.Button
     toggleBtn.BorderSizePixel = 0
     toggleBtn.Size = UDim2.new(0, 70, 0, 30)
     toggleBtn.Position = UDim2.new(0.75, 0, 0.5, -15)
-    toggleBtn.Text = "Off"
-    toggleBtn.TextColor3 = Color3.fromRGB(255,255,255)
+    toggleBtn.TextColor3 = self.themeData.Text
     toggleBtn.Font = Enum.Font.Gotham
     toggleBtn.TextSize = 14
 
     local state = data.Default or false
     toggleBtn.Text = state and "On" or "Off"
-    toggleBtn.BackgroundColor3 = state and Color3.fromRGB(0,200,0) or Color3.fromRGB(200,0,0)
+    toggleBtn.BackgroundColor3 = state and self.themeData.ToggleOn or self.themeData.ToggleOff
 
     toggleBtn.MouseButton1Click:Connect(function()
         state = not state
@@ -412,7 +365,6 @@ function UIModule:createToggle(parent, data)
         if data.Callback then data.Callback(state) end
     end)
 
-    -- Bind key
     local bindKey = nil
     if data.Bind then
         local key = getKeyEnum(data.Bind)
@@ -446,7 +398,6 @@ function UIModule:createToggle(parent, data)
     return element
 end
 
--- ============ Button ============
 function UIModule:createButton(parent, data)
     local frame = Instance.new("Frame")
     frame.Parent = parent
@@ -456,12 +407,12 @@ function UIModule:createButton(parent, data)
 
     local btn = Instance.new("TextButton")
     btn.Parent = frame
-    btn.BackgroundColor3 = Color3.fromRGB(60,60,60)
+    btn.BackgroundColor3 = self.themeData.Button
     btn.BorderSizePixel = 0
     btn.Size = UDim2.new(0.9, 0, 0, 30)
     btn.Position = UDim2.new(0.05, 0, 0.5, -15)
     btn.Text = data.Name
-    btn.TextColor3 = Color3.fromRGB(255,255,255)
+    btn.TextColor3 = self.themeData.Text
     btn.Font = Enum.Font.Gotham
     btn.TextSize = 16
     btn.AutoButtonColor = false
@@ -488,7 +439,6 @@ function UIModule:createButton(parent, data)
     return element
 end
 
--- ============ Slider ============
 function UIModule:createSlider(parent, data)
     local frame = Instance.new("Frame")
     frame.Parent = parent
@@ -500,7 +450,7 @@ function UIModule:createSlider(parent, data)
     label.Parent = frame
     label.BackgroundTransparency = 1
     label.Text = data.Name .. ": " .. tostring(data.Default or data.Min or 0)
-    label.TextColor3 = Color3.fromRGB(255,255,255)
+    label.TextColor3 = self.themeData.Text
     label.TextSize = 16
     label.Font = Enum.Font.Gotham
     label.TextXAlignment = Enum.TextXAlignment.Left
@@ -509,21 +459,21 @@ function UIModule:createSlider(parent, data)
 
     local track = Instance.new("Frame")
     track.Parent = frame
-    track.BackgroundColor3 = Color3.fromRGB(70,70,70)
+    track.BackgroundColor3 = self.themeData.SliderTrack
     track.BorderSizePixel = 0
     track.Size = UDim2.new(0.8, 0, 0, 6)
     track.Position = UDim2.new(0.1, 0, 0.5, -3)
 
     local fill = Instance.new("Frame")
     fill.Parent = track
-    fill.BackgroundColor3 = Color3.fromRGB(0,120,255)
+    fill.BackgroundColor3 = self.themeData.SliderFill
     fill.BorderSizePixel = 0
     fill.Size = UDim2.new(0, 0, 1, 0)
     fill.Position = UDim2.new(0, 0, 0, 0)
 
     local knob = Instance.new("TextButton")
     knob.Parent = frame
-    knob.BackgroundColor3 = Color3.fromRGB(200,200,200)
+    knob.BackgroundColor3 = self.themeData.Button
     knob.BorderSizePixel = 0
     knob.Size = UDim2.new(0, 16, 0, 16)
     knob.Position = UDim2.new(0.1, -8, 0.5, -8)
@@ -589,13 +539,11 @@ function UIModule:createSlider(parent, data)
             track.BackgroundColor3 = themeData.SliderTrack
             fill.BackgroundColor3 = themeData.SliderFill
             knob.BackgroundColor3 = themeData.Button
-            knob.TextColor3 = themeData.Text
         end
     }
     return element
 end
 
--- ============ Dropdown ============
 function UIModule:createDropdown(parent, data)
     local frame = Instance.new("Frame")
     frame.Parent = parent
@@ -607,7 +555,7 @@ function UIModule:createDropdown(parent, data)
     label.Parent = frame
     label.BackgroundTransparency = 1
     label.Text = data.Name
-    label.TextColor3 = Color3.fromRGB(255,255,255)
+    label.TextColor3 = self.themeData.Text
     label.TextSize = 16
     label.Font = Enum.Font.Gotham
     label.TextXAlignment = Enum.TextXAlignment.Left
@@ -616,19 +564,19 @@ function UIModule:createDropdown(parent, data)
 
     local btn = Instance.new("TextButton")
     btn.Parent = frame
-    btn.BackgroundColor3 = Color3.fromRGB(60,60,60)
+    btn.BackgroundColor3 = self.themeData.Button
     btn.BorderSizePixel = 0
     btn.Size = UDim2.new(0.5, 0, 0, 30)
     btn.Position = UDim2.new(0.4, 0, 0.5, -15)
     btn.Text = data.Default or "Select"
-    btn.TextColor3 = Color3.fromRGB(255,255,255)
+    btn.TextColor3 = self.themeData.Text
     btn.Font = Enum.Font.Gotham
     btn.TextSize = 14
     btn.AutoButtonColor = false
 
     local dropdownFrame = Instance.new("Frame")
     dropdownFrame.Parent = frame
-    dropdownFrame.BackgroundColor3 = Color3.fromRGB(50,50,50)
+    dropdownFrame.BackgroundColor3 = self.themeData.DropdownBg
     dropdownFrame.BorderSizePixel = 0
     dropdownFrame.Size = UDim2.new(0.5, 0, 0, 0)
     dropdownFrame.Position = UDim2.new(0.4, 0, 1, 0)
@@ -678,11 +626,11 @@ function UIModule:createDropdown(parent, data)
     local function createOption(opt)
         local optBtn = Instance.new("TextButton")
         optBtn.Parent = list
-        optBtn.BackgroundColor3 = Color3.fromRGB(60,60,60)
+        optBtn.BackgroundColor3 = self.themeData.DropdownItem
         optBtn.BorderSizePixel = 0
         optBtn.Size = UDim2.new(1, 0, 0, 30)
         optBtn.Text = opt
-        optBtn.TextColor3 = Color3.fromRGB(255,255,255)
+        optBtn.TextColor3 = self.themeData.Text
         optBtn.Font = Enum.Font.Gotham
         optBtn.TextSize = 14
         optBtn.AutoButtonColor = false
@@ -713,7 +661,6 @@ function UIModule:createDropdown(parent, data)
         createOption(opt)
     end
 
-    -- Toggle dropdown visibility
     btn.MouseButton1Click:Connect(function()
         dropdownFrame.Visible = not dropdownFrame.Visible
         if dropdownFrame.Visible then
@@ -723,22 +670,9 @@ function UIModule:createDropdown(parent, data)
         end
     end)
 
-    -- Close dropdown when clicking outside (simple: hide on any click outside)
-    local function closeDropdown()
-        dropdownFrame.Visible = false
-    end
-    -- We'll handle by listening to mouse clicks on the frame itself? Simpler: add a temporary connection.
-    local clickConn
-    btn.MouseButton1Click:Connect(function()
-        if dropdownFrame.Visible then
-            -- close on next click outside?
-        end
-    end)
-    -- Use a global click listener: any click outside dropdown closes it.
     local function onGlobalClick(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
             if dropdownFrame.Visible then
-                -- Check if click is inside dropdown or on button
                 local mouse = player:GetMouse()
                 if not dropdownFrame:IsAncestorOf(mouse.Target) and btn ~= mouse.Target and not btn:IsAncestorOf(mouse.Target) then
                     dropdownFrame.Visible = false
@@ -747,8 +681,6 @@ function UIModule:createDropdown(parent, data)
         end
     end
     local globalConn = UserInputService.InputBegan:Connect(onGlobalClick)
-
-    -- Store connection for cleanup
     frame._globalConn = globalConn
 
     local element = {
@@ -779,11 +711,9 @@ function UIModule:createDropdown(parent, data)
     return element
 end
 
--- ============ Settings Tab ============
 function UIModule:addSettingsTab()
     local settingsElements = {}
 
-    -- Theme dropdown
     local themeOptions = {}
     for name in pairs(Themes) do
         table.insert(themeOptions, name)
@@ -800,7 +730,6 @@ function UIModule:addSettingsTab()
         end
     }
 
-    -- Toggle Key dropdown (common keys)
     local keyOptions = {"RightControl", "LeftControl", "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12", "Insert", "Home", "PageUp", "Delete", "End", "PageDown"}
     settingsElements[#settingsElements+1] = {
         Type = "Dropdown",
@@ -813,7 +742,6 @@ function UIModule:addSettingsTab()
         end
     }
 
-    -- Size Ratio dropdown
     local ratioOptions = {"1:1", "2:3", "3:4", "4:5", "5:6", "1:2", "1:3", "2:1", "3:1", "4:3", "16:9", "9:16"}
     settingsElements[#settingsElements+1] = {
         Type = "Dropdown",
@@ -829,7 +757,6 @@ function UIModule:addSettingsTab()
     self:addTab("Settings", settingsElements)
 end
 
--- ============ Theme & Settings ============
 function UIModule:setTheme(themeName)
     if not Themes[themeName] then return end
     self.theme = themeName
@@ -840,7 +767,6 @@ end
 
 function UIModule:applyTheme(themeName)
     self.themeData = Themes[themeName] or Themes.Dark
-    -- Apply to main frame
     self.mainFrame.BackgroundColor3 = self.themeData.Background
     self.titleBar.BackgroundColor3 = self.themeData.TabSelected
     self.titleLabel.TextColor3 = self.themeData.Text
@@ -848,13 +774,11 @@ function UIModule:applyTheme(themeName)
     self.contentPanel.BackgroundColor3 = self.themeData.Panel
     self.closeButton.TextColor3 = self.themeData.Text
 
-    -- Apply to tab buttons
     for name, btn in pairs(self.tabButtons) do
         btn.BackgroundColor3 = (name == self.currentTab) and self.themeData.TabSelected or self.themeData.Tab
         btn.TextColor3 = self.themeData.Text
     end
 
-    -- Apply to all elements in all tabs
     for tabName, elemList in pairs(self.elements) do
         for _, elem in ipairs(elemList) do
             self:applyThemeToElement(elem)
@@ -898,7 +822,6 @@ function UIModule:setSizeRatio(ratioStr)
     self.aspectConstraint.AspectRatio = parseRatio(ratioStr)
 end
 
--- ============ Visibility ============
 function UIModule:toggleVisibility()
     self.visible = not self.visible
     self.mainFrame.Visible = self.visible
@@ -909,7 +832,6 @@ function UIModule:setVisible(vis)
     self.mainFrame.Visible = vis
 end
 
--- ============ Destruction ============
 function UIModule:destroy()
     if self.gui then
         self.gui:Destroy()
@@ -918,7 +840,6 @@ function UIModule:destroy()
         self.toggleConnection:Disconnect()
         self.toggleConnection = nil
     end
-    -- Cleanup any global connections stored in elements
     for tabName, elemList in pairs(self.elements) do
         for _, elem in ipairs(elemList) do
             if elem.frame and elem.frame._bindConnection then
@@ -931,5 +852,4 @@ function UIModule:destroy()
     end
 end
 
--- ============ Return ============
 return UIModule
