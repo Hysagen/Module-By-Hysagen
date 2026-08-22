@@ -417,7 +417,7 @@ local function createMainFrame(title)
     function UIFramework:CreateDropdown(page, label, options, defaultOption, multiSelect)
         local container = createElementContainer(page)
         
-        -- Основной фрейм дропдауна (всегда фиксированного размера)
+        -- Основной фрейм дропдауна
         local dropdownFrame = Instance.new("Frame")
         dropdownFrame.Size = UDim2.new(1, -16, 0, 36)
         dropdownFrame.Position = UDim2.new(0, 8, 0, 4)
@@ -454,7 +454,7 @@ local function createMainFrame(title)
         selectedText.Font = Enum.Font.GothamBold
         selectedText.Parent = dropdownFrame
         
-        -- Стрелка (всегда видна)
+        -- Стрелка
         local arrow = Instance.new("TextButton")
         arrow.Size = UDim2.new(0, 30, 0, 30)
         arrow.Position = UDim2.new(1, -36, 0.5, -15)
@@ -465,7 +465,7 @@ local function createMainFrame(title)
         arrow.Font = Enum.Font.GothamBold
         arrow.Parent = dropdownFrame
         
-        -- ВЫПАДАЮЩИЙ СПИСОК (поверх всего, не влияет на размер родителя)
+        -- Выпадающий список
         local dropdownList = Instance.new("Frame")
         dropdownList.Size = UDim2.new(1, 0, 0, 0)
         dropdownList.Position = UDim2.new(0, 0, 0, 36)
@@ -479,7 +479,6 @@ local function createMainFrame(title)
         listCorner.CornerRadius = UDim.new(0, 4)
         listCorner.Parent = dropdownList
         
-        -- Тень для списка
         local listShadow = Instance.new("Frame")
         listShadow.Size = UDim2.new(1, 0, 1, 0)
         listShadow.Position = UDim2.new(0, 4, 0, 4)
@@ -498,14 +497,16 @@ local function createMainFrame(title)
         listLayout.SortOrder = Enum.SortOrder.LayoutOrder
         listLayout.Parent = dropdownList
         
+        -- Локальные переменные для этого дропдауна
         local selected = {}
+        local dropdownItems = {}
+        local isOpen = false
+        
         if multiSelect then
             selected = {}
         else
             selected = defaultOption
         end
-        local dropdownItems = {}
-        local isOpen = false
         
         local function updateListSize()
             local count = 0
@@ -532,6 +533,7 @@ local function createMainFrame(title)
             end
         end
         
+        -- Создаём кнопки для каждого варианта
         for _, option in ipairs(options) do
             local btn = Instance.new("TextButton")
             btn.Size = UDim2.new(1, -8, 0, 28)
@@ -567,6 +569,7 @@ local function createMainFrame(title)
                 CheckMark = checkMark
             }
             
+            -- Локальная функция для этой кнопки
             btn.MouseButton1Click:Connect(function()
                 if multiSelect then
                     selected[option] = not selected[option]
@@ -589,6 +592,7 @@ local function createMainFrame(title)
             end)
         end
         
+        -- Выделяем дефолтный вариант
         if not multiSelect then
             for opt, data in pairs(dropdownItems) do
                 if opt == defaultOption then
@@ -598,7 +602,7 @@ local function createMainFrame(title)
             end
         end
         
-        -- Стрелка открывает/закрывает
+        -- Стрелка открывает/закрывает ТОЛЬКО ЭТОТ дропдаун
         arrow.MouseButton1Click:Connect(function()
             isOpen = not isOpen
             dropdownList.Visible = isOpen
