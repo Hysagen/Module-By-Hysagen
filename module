@@ -126,14 +126,7 @@ local function createMainFrame(title)
     leftMask.BorderSizePixel = 0
     leftMask.Parent = leftPanel
     
-    -- КОНТЕЙНЕР ДЛЯ КНОПОК (с вертикальным центрированием)
-    local buttonContainer = Instance.new("Frame")
-    buttonContainer.Name = "ButtonContainer"
-    buttonContainer.Size = UDim2.new(1, 0, 1, 0)
-    buttonContainer.BackgroundTransparency = 1
-    buttonContainer.Parent = leftPanel
-    
-    -- Скроллинг для кнопок
+    -- Скроллинг для левой панели
     local leftScrolling = Instance.new("ScrollingFrame")
     leftScrolling.Size = UDim2.new(1, 0, 1, 0)
     leftScrolling.BackgroundTransparency = 1
@@ -141,14 +134,14 @@ local function createMainFrame(title)
     leftScrolling.ScrollBarThickness = 4
     leftScrolling.ScrollBarImageColor3 = COLORS.Accent
     leftScrolling.CanvasSize = UDim2.new(0, 0, 0, 0)
-    leftScrolling.Parent = buttonContainer
+    leftScrolling.Parent = leftPanel
     
-    -- UIListLayout для вертикального центрирования
+    -- UIListLayout для кнопок (центр по X, сверху вниз по Y)
     local leftLayout = Instance.new("UIListLayout")
     leftLayout.Padding = UDim.new(0, 4)
     leftLayout.SortOrder = Enum.SortOrder.LayoutOrder
     leftLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    leftLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+    leftLayout.VerticalAlignment = Enum.VerticalAlignment.Top
     leftLayout.Parent = leftScrolling
     
     -- ПРАВАЯ ПАНЕЛЬ
@@ -201,18 +194,18 @@ local function createMainFrame(title)
         pageLayout.SortOrder = Enum.SortOrder.LayoutOrder
         pageLayout.Parent = pageFrame
         
-        -- Кнопка в левой панели (центрированная)
+        -- Кнопка в левой панели (по центру по X, сверху вниз)
         local tabBtn = Instance.new("TextButton")
         tabBtn.Name = name .. "Tab"
-        tabBtn.Size = UDim2.new(0, 140, 0, 36)  -- Фиксированная ширина
+        tabBtn.Size = UDim2.new(0, 140, 0, 36)
         tabBtn.BackgroundColor3 = COLORS.TabInactive
         tabBtn.BackgroundTransparency = 0
         tabBtn.BorderSizePixel = 0
         tabBtn.Text = name
         tabBtn.TextColor3 = COLORS.TextDim
         tabBtn.TextSize = 14
-        tabBtn.TextXAlignment = Enum.TextXAlignment.Center  -- Текст по центру
-        tabBtn.TextYAlignment = Enum.TextYAlignment.Center  -- Текст по центру
+        tabBtn.TextXAlignment = Enum.TextXAlignment.Center
+        tabBtn.TextYAlignment = Enum.TextYAlignment.Center
         tabBtn.TextTruncate = Enum.TextTruncate.AtEnd
         tabBtn.Font = Enum.Font.GothamSemibold
         tabBtn.Parent = leftScrolling
