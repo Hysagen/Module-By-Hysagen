@@ -23,26 +23,12 @@ local function createMainFrame(title)
     mainFrame.Position = UDim2.new(0.5, -300, 0.5, -200)
     mainFrame.BackgroundColor3 = COLORS.Background
     mainFrame.BackgroundTransparency = 0
-    mainFrame.BorderSizePixel = 0  -- ОБВОДКИ НЕТ
+    mainFrame.BorderSizePixel = 0
     mainFrame.Parent = screenGui
     
     local mainCorner = Instance.new("UICorner")
     mainCorner.CornerRadius = UDim.new(0, 8)
     mainCorner.Parent = mainFrame
-    
-    -- Тень
-    local shadow = Instance.new("Frame")
-    shadow.Size = UDim2.new(1, 0, 1, 0)
-    shadow.Position = UDim2.new(0, 8, 0, 8)
-    shadow.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    shadow.BackgroundTransparency = 0.5
-    shadow.BorderSizePixel = 0
-    shadow.ZIndex = 0
-    shadow.Parent = mainFrame
-    
-    local shadowCorner = Instance.new("UICorner")
-    shadowCorner.CornerRadius = UDim.new(0, 8)
-    shadowCorner.Parent = shadow
     
     -- Верхняя панель
     local topBar = Instance.new("Frame")
@@ -50,7 +36,7 @@ local function createMainFrame(title)
     topBar.Size = UDim2.new(1, 0, 0, 36)
     topBar.BackgroundColor3 = COLORS.TopBar
     topBar.BackgroundTransparency = 0
-    topBar.BorderSizePixel = 0  -- ОБВОДКИ НЕТ
+    topBar.BorderSizePixel = 0
     topBar.Parent = mainFrame
     
     local topCorner = Instance.new("UICorner")
@@ -105,7 +91,7 @@ local function createMainFrame(title)
     leftPanel.Size = UDim2.new(0, 180, 1, 0)
     leftPanel.BackgroundColor3 = Color3.fromRGB(40, 40, 48)
     leftPanel.BackgroundTransparency = 0
-    leftPanel.BorderSizePixel = 0  -- ОБВОДКИ НЕТ
+    leftPanel.BorderSizePixel = 0
     leftPanel.Parent = container
     
     local leftCorner = Instance.new("UICorner")
@@ -144,7 +130,7 @@ local function createMainFrame(title)
     rightPanel.Position = UDim2.new(0, 180, 0, 0)
     rightPanel.BackgroundColor3 = COLORS.Background
     rightPanel.BackgroundTransparency = 0
-    rightPanel.BorderSizePixel = 0  -- ОБВОДКИ НЕТ
+    rightPanel.BorderSizePixel = 0
     rightPanel.Parent = container
     
     local rightCorner = Instance.new("UICorner")
@@ -188,7 +174,7 @@ local function createMainFrame(title)
         tabBtn.Size = UDim2.new(0, 140, 0, 36)
         tabBtn.BackgroundColor3 = COLORS.TabInactive
         tabBtn.BackgroundTransparency = 0
-        tabBtn.BorderSizePixel = 0  -- ОБВОДКИ НЕТ
+        tabBtn.BorderSizePixel = 0
         tabBtn.Text = name
         tabBtn.TextColor3 = COLORS.TextDim
         tabBtn.TextSize = 14
