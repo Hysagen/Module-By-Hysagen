@@ -446,7 +446,10 @@ local function createMainFrame(title)
         local function startDrag(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 then
                 dragging = true
-                local percentage = math.clamp((input.Position.X - slider.AbsolutePosition.X) / slider.AbsoluteSize.X, 0, 1)
+                local mousePos = input.Position.X
+                local sliderPos = slider.AbsolutePosition.X
+                local sliderWidth = slider.AbsoluteSize.X
+                local percentage = math.clamp((mousePos - sliderPos) / sliderWidth, 0, 1)
                 local newValue = min + (max - min) * percentage
                 updateSlider(newValue)
             end
@@ -454,7 +457,10 @@ local function createMainFrame(title)
         
         local function moveDrag(input)
             if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-                local percentage = math.clamp((input.Position.X - slider.AbsolutePosition.X) / slider.AbsoluteSize.X, 0, 1)
+                local mousePos = input.Position.X
+                local sliderPos = slider.AbsolutePosition.X
+                local sliderWidth = slider.AbsoluteSize.X
+                local percentage = math.clamp((mousePos - sliderPos) / sliderWidth, 0, 1)
                 local newValue = min + (max - min) * percentage
                 updateSlider(newValue)
             end
@@ -476,15 +482,18 @@ local function createMainFrame(title)
         handleBorder.InputBegan:Connect(startDrag)
         handleBorder.InputEnded:Connect(endDrag)
         
-        game:GetService("UserInputService").InputChanged:Connect(moveDrag)
-        game:GetService("UserInputService").InputEnded:Connect(endDrag)
+        -- Глобальные события
+        local inputService = game:GetService("UserInputService")
+        local moveConnection = inputService.InputChanged:Connect(moveDrag)
+        local endConnection = inputService.InputEnded:Connect(endDrag)
         
         task.wait(0.05)
         updatePagesCanvas()
         
         return {
             SetValue = updateSlider,
-            GetValue = function() return value end
+            GetValue = function() return value end,
+            _connections = {moveConnection, endConnection}
         }
     end
     
@@ -831,7 +840,8 @@ local function createMainFrame(title)
             if data and data.Button then
                 data.Button.BackgroundColor3 = COLORS.TabInactive
                 data.Button.TextColor3 = COLORS.TextDim
-            end        end
+            end
+        end
         
         if pages[name] and pages[name].Frame then
             pages[name].Frame.Visible = true
