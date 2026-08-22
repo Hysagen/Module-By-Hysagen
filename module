@@ -5,10 +5,13 @@ local COLORS = {
     Background = Color3.fromRGB(30, 30, 36),
     TopBar = Color3.fromRGB(45, 45, 54),
     Accent = Color3.fromRGB(0, 150, 255),
+    AccentHover = Color3.fromRGB(0, 170, 255),
     TabInactive = Color3.fromRGB(40, 40, 48),
     TabActive = Color3.fromRGB(55, 55, 65),
     Text = Color3.fromRGB(255, 255, 255),
     TextDim = Color3.fromRGB(180, 180, 195),
+    Red = Color3.fromRGB(255, 70, 70),
+    Green = Color3.fromRGB(70, 255, 70),
 }
 
 local function createMainFrame(title)
@@ -51,7 +54,6 @@ local function createMainFrame(title)
     topMask.BorderSizePixel = 0
     topMask.Parent = topBar
     
-    -- Заголовок
     local titleLabel = Instance.new("TextLabel")
     titleLabel.Size = UDim2.new(1, -50, 1, 0)
     titleLabel.Position = UDim2.new(0, 12, 0, 0)
@@ -63,7 +65,6 @@ local function createMainFrame(title)
     titleLabel.Font = Enum.Font.GothamBold
     titleLabel.Parent = topBar
     
-    -- Кнопка закрытия
     local closeBtn = Instance.new("TextButton")
     closeBtn.Size = UDim2.new(0, 30, 0, 30)
     closeBtn.Position = UDim2.new(1, -36, 0, 3)
@@ -106,7 +107,6 @@ local function createMainFrame(title)
     leftMask.BorderSizePixel = 0
     leftMask.Parent = leftPanel
     
-    -- Скроллинг
     local leftScrolling = Instance.new("ScrollingFrame")
     leftScrolling.Size = UDim2.new(1, 0, 1, 0)
     leftScrolling.BackgroundTransparency = 1
@@ -145,7 +145,6 @@ local function createMainFrame(title)
     rightMask.BorderSizePixel = 0
     rightMask.Parent = rightPanel
     
-    -- Контейнер для страниц
     local pagesContainer = Instance.new("Frame")
     pagesContainer.Name = "PagesContainer"
     pagesContainer.Size = UDim2.new(1, -16, 1, -16)
@@ -156,6 +155,466 @@ local function createMainFrame(title)
     local pages = {}
     local activePage = nil
     
+    -- === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
+    local function createElementContainer(parent)
+        local frame = Instance.new("Frame")
+        frame.Size = UDim2.new(1, 0, 0, 40)
+        frame.BackgroundTransparency = 1
+        frame.Parent = parent
+        return frame
+    end
+    
+    -- === 1) КНОПКА С БИНДОМ ===
+    function UIFramework:CreateToggleWithBind(page, label, defaultState, bindKey)
+        local container = createElementContainer(page)
+        
+        local toggleFrame = Instance.new("Frame")
+        toggleFrame.Size = UDim2.new(1, -16, 0, 32)
+        toggleFrame.Position = UDim2.new(0, 8, 0, 4)
+        toggleFrame.BackgroundColor3 = COLORS.TabInactive
+        toggleFrame.BackgroundTransparency = 0
+        toggleFrame.BorderSizePixel = 0
+        toggleFrame.Parent = container
+        
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 4)
+        corner.Parent = toggleFrame
+        
+        local labelText = Instance.new("TextLabel")
+        labelText.Size = UDim2.new(0.6, 0, 1, 0)
+        labelText.Position = UDim2.new(0, 8, 0, 0)
+        labelText.BackgroundTransparency = 1
+        labelText.Text = label .. " [" .. string.upper(bindKey) .. "]"
+        labelText.TextColor3 = COLORS.Text
+        labelText.TextSize = 14
+        labelText.TextXAlignment = Enum.TextXAlignment.Left
+        labelText.Font = Enum.Font.GothamSemibold
+        labelText.Parent = toggleFrame
+        
+        local state = defaultState or false
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(0, 60, 0, 24)
+        btn.Position = UDim2.new(1, -68, 0.5, -12)
+        btn.BackgroundColor3 = state and COLORS.Green or COLORS.Red
+        btn.BackgroundTransparency = 0
+        btn.BorderSizePixel = 0
+        btn.Text = state and "ON" or "OFF"
+        btn.TextColor3 = COLORS.Text
+        btn.TextSize = 12
+        btn.Font = Enum.Font.GothamBold
+        btn.Parent = toggleFrame
+        
+        local btnCorner = Instance.new("UICorner")
+        btnCorner.CornerRadius = UDim.new(0, 4)
+        btnCorner.Parent = btn
+        
+        local function toggle()
+            state = not state
+            btn.BackgroundColor3 = state and COLORS.Green or COLORS.Red
+            btn.Text = state and "ON" or "OFF"
+        end
+        
+        btn.MouseButton1Click:Connect(toggle)
+        
+        -- Бинд на клавишу
+        local connection
+        connection = game:GetService("UserInputService").InputBegan:Connect(function(input, gameProcessed)
+            if gameProcessed then return end
+            if input.KeyCode == Enum.KeyCode[bindKey] then
+                toggle()
+            end
+        end)
+        
+        return {
+            Toggle = toggle,
+            SetState = function(newState)
+                state = newState
+                btn.BackgroundColor3 = state and COLORS.Green or COLORS.Red
+                btn.Text = state and "ON" or "OFF"
+            end,
+            GetState = function() return state end,
+            Connection = connection
+        }
+    end
+    
+    -- === 2) КНОПКА БЕЗ БИНДА ===
+    function UIFramework:CreateToggle(page, label, defaultState)
+        local container = createElementContainer(page)
+        
+        local toggleFrame = Instance.new("Frame")
+        toggleFrame.Size = UDim2.new(1, -16, 0, 32)
+        toggleFrame.Position = UDim2.new(0, 8, 0, 4)
+        toggleFrame.BackgroundColor3 = COLORS.TabInactive
+        toggleFrame.BackgroundTransparency = 0
+        toggleFrame.BorderSizePixel = 0
+        toggleFrame.Parent = container
+        
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 4)
+        corner.Parent = toggleFrame
+        
+        local labelText = Instance.new("TextLabel")
+        labelText.Size = UDim2.new(0.6, 0, 1, 0)
+        labelText.Position = UDim2.new(0, 8, 0, 0)
+        labelText.BackgroundTransparency = 1
+        labelText.Text = label
+        labelText.TextColor3 = COLORS.Text
+        labelText.TextSize = 14
+        labelText.TextXAlignment = Enum.TextXAlignment.Left
+        labelText.Font = Enum.Font.GothamSemibold
+        labelText.Parent = toggleFrame
+        
+        local state = defaultState or false
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(0, 60, 0, 24)
+        btn.Position = UDim2.new(1, -68, 0.5, -12)
+        btn.BackgroundColor3 = state and COLORS.Green or COLORS.Red
+        btn.BackgroundTransparency = 0
+        btn.BorderSizePixel = 0
+        btn.Text = state and "ON" or "OFF"
+        btn.TextColor3 = COLORS.Text
+        btn.TextSize = 12
+        btn.Font = Enum.Font.GothamBold
+        btn.Parent = toggleFrame
+        
+        local btnCorner = Instance.new("UICorner")
+        btnCorner.CornerRadius = UDim.new(0, 4)
+        btnCorner.Parent = btn
+        
+        local function toggle()
+            state = not state
+            btn.BackgroundColor3 = state and COLORS.Green or COLORS.Red
+            btn.Text = state and "ON" or "OFF"
+        end
+        
+        btn.MouseButton1Click:Connect(toggle)
+        
+        return {
+            Toggle = toggle,
+            SetState = function(newState)
+                state = newState
+                btn.BackgroundColor3 = state and COLORS.Green or COLORS.Red
+                btn.Text = state and "ON" or "OFF"
+            end,
+            GetState = function() return state end
+        }
+    end
+    
+    -- === 3) ПОЛЗУНОК ===
+    function UIFramework:CreateSlider(page, label, min, max, default, decimals)
+        decimals = decimals or 0
+        local container = createElementContainer(page)
+        container.Size = UDim2.new(1, 0, 0, 50)
+        
+        local sliderFrame = Instance.new("Frame")
+        sliderFrame.Size = UDim2.new(1, -16, 0, 42)
+        sliderFrame.Position = UDim2.new(0, 8, 0, 4)
+        sliderFrame.BackgroundColor3 = COLORS.TabInactive
+        sliderFrame.BackgroundTransparency = 0
+        sliderFrame.BorderSizePixel = 0
+        sliderFrame.Parent = container
+        
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 4)
+        corner.Parent = sliderFrame
+        
+        local labelText = Instance.new("TextLabel")
+        labelText.Size = UDim2.new(0.5, 0, 0, 20)
+        labelText.Position = UDim2.new(0, 8, 0, 2)
+        labelText.BackgroundTransparency = 1
+        labelText.Text = label
+        labelText.TextColor3 = COLORS.Text
+        labelText.TextSize = 13
+        labelText.TextXAlignment = Enum.TextXAlignment.Left
+        labelText.Font = Enum.Font.GothamSemibold
+        labelText.Parent = sliderFrame
+        
+        local valueLabel = Instance.new("TextLabel")
+        valueLabel.Size = UDim2.new(0.3, 0, 0, 20)
+        valueLabel.Position = UDim2.new(0.7, 0, 0, 2)
+        valueLabel.BackgroundTransparency = 1
+        valueLabel.Text = tostring(default or min)
+        valueLabel.TextColor3 = COLORS.Accent
+        valueLabel.TextSize = 13
+        valueLabel.TextXAlignment = Enum.TextXAlignment.Right
+        valueLabel.Font = Enum.Font.GothamBold
+        valueLabel.Parent = sliderFrame
+        
+        local slider = Instance.new("Frame")
+        slider.Size = UDim2.new(0.9, 0, 0, 4)
+        slider.Position = UDim2.new(0.05, 0, 1, -10)
+        slider.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+        slider.BackgroundTransparency = 0
+        slider.BorderSizePixel = 0
+        slider.Parent = sliderFrame
+        
+        local sliderCorner = Instance.new("UICorner")
+        sliderCorner.CornerRadius = UDim.new(0, 2)
+        sliderCorner.Parent = slider
+        
+        local fill = Instance.new("Frame")
+        fill.Size = UDim2.new(0.5, 0, 1, 0)
+        fill.BackgroundColor3 = COLORS.Accent
+        fill.BackgroundTransparency = 0
+        fill.BorderSizePixel = 0
+        fill.Parent = slider
+        
+        local fillCorner = Instance.new("UICorner")
+        fillCorner.CornerRadius = UDim.new(0, 2)
+        fillCorner.Parent = fill
+        
+        local value = default or min
+        local function updateSlider(newValue)
+            value = math.clamp(newValue, min, max)
+            if decimals == 0 then
+                value = math.round(value)
+            end
+            local percentage = (value - min) / (max - min)
+            fill.Size = UDim2.new(percentage, 0, 1, 0)
+            valueLabel.Text = tostring(value)
+        end
+        
+        updateSlider(value)
+        
+        local dragging = false
+        slider.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                dragging = true
+                local percentage = math.clamp((input.Position.X - slider.AbsolutePosition.X) / slider.AbsoluteSize.X, 0, 1)
+                local newValue = min + (max - min) * percentage
+                updateSlider(newValue)
+            end
+        end)
+        
+        game:GetService("UserInputService").InputChanged:Connect(function(input)
+            if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+                local percentage = math.clamp((input.Position.X - slider.AbsolutePosition.X) / slider.AbsoluteSize.X, 0, 1)
+                local newValue = min + (max - min) * percentage
+                updateSlider(newValue)
+            end
+        end)
+        
+        game:GetService("UserInputService").InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                dragging = false
+            end
+        end)
+        
+        return {
+            SetValue = updateSlider,
+            GetValue = function() return value end
+        }
+    end
+    
+    -- === 4) КНОПКА-СПИСОК ===
+    function UIFramework:CreateDropdown(page, label, options, defaultOption, multiSelect)
+        local container = createElementContainer(page)
+        container.Size = UDim2.new(1, 0, 0, 50)
+        
+        local dropdownFrame = Instance.new("Frame")
+        dropdownFrame.Size = UDim2.new(1, -16, 0, 42)
+        dropdownFrame.Position = UDim2.new(0, 8, 0, 4)
+        dropdownFrame.BackgroundColor3 = COLORS.TabInactive
+        dropdownFrame.BackgroundTransparency = 0
+        dropdownFrame.BorderSizePixel = 0
+        dropdownFrame.Parent = container
+        
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 4)
+        corner.Parent = dropdownFrame
+        
+        local labelText = Instance.new("TextLabel")
+        labelText.Size = UDim2.new(0.4, 0, 0, 20)
+        labelText.Position = UDim2.new(0, 8, 0, 2)
+        labelText.BackgroundTransparency = 1
+        labelText.Text = label
+        labelText.TextColor3 = COLORS.Text
+        labelText.TextSize = 13
+        labelText.TextXAlignment = Enum.TextXAlignment.Left
+        labelText.Font = Enum.Font.GothamSemibold
+        labelText.Parent = dropdownFrame
+        
+        local selectedText = Instance.new("TextLabel")
+        selectedText.Size = UDim2.new(0.4, 0, 0, 20)
+        selectedText.Position = UDim2.new(0.55, 0, 0, 2)
+        selectedText.BackgroundTransparency = 1
+        selectedText.Text = defaultOption or "Выберите..."
+        selectedText.TextColor3 = COLORS.Accent
+        selectedText.TextSize = 13
+        selectedText.TextXAlignment = Enum.TextXAlignment.Right
+        selectedText.Font = Enum.Font.GothamBold
+        selectedText.Parent = dropdownFrame
+        
+        local arrow = Instance.new("TextButton")
+        arrow.Size = UDim2.new(0, 30, 0, 30)
+        arrow.Position = UDim2.new(1, -36, 0.5, -15)
+        arrow.BackgroundTransparency = 1
+        arrow.Text = "▼"
+        arrow.TextColor3 = COLORS.TextDim
+        arrow.TextSize = 14
+        arrow.Font = Enum.Font.GothamBold
+        arrow.Parent = dropdownFrame
+        
+        local dropdownList = Instance.new("Frame")
+        dropdownList.Size = UDim2.new(1, 0, 0, 0)
+        dropdownList.Position = UDim2.new(0, 0, 0, 42)
+        dropdownList.BackgroundColor3 = COLORS.TabInactive
+        dropdownList.BackgroundTransparency = 0
+        dropdownList.BorderSizePixel = 0
+        dropdownList.Visible = false
+        dropdownList.Parent = dropdownFrame
+        
+        local listCorner = Instance.new("UICorner")
+        listCorner.CornerRadius = UDim.new(0, 4)
+        listCorner.Parent = dropdownList
+        
+        local listLayout = Instance.new("UIListLayout")
+        listLayout.Padding = UDim.new(0, 2)
+        listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+        listLayout.Parent = dropdownList
+        
+        local selected = multiSelect and {} or defaultOption
+        local dropdownItems = {}
+        local isOpen = false
+        
+        local function updateListSize()
+            local count = #dropdownItems
+            dropdownList.Size = UDim2.new(1, 0, 0, count * 30 + 4)
+            dropdownFrame.Size = UDim2.new(1, -16, 0, 42 + (isOpen and (count * 30 + 4) or 0))
+            container.Size = UDim2.new(1, 0, 0, 50 + (isOpen and (count * 30 + 4) or 0))
+        end
+        
+        local function updateSelectedText()
+            if multiSelect then
+                local count = 0
+                for _, val in pairs(selected) do
+                    if val then count = count + 1 end
+                end
+                selectedText.Text = count > 0 and ("Выбрано: " .. count) or "Ничего не выбрано"
+            else
+                selectedText.Text = selected or "Выберите..."
+            end
+        end
+        
+        for _, option in ipairs(options) do
+            local btn = Instance.new("TextButton")
+            btn.Size = UDim2.new(1, -8, 0, 28)
+            btn.Position = UDim2.new(0, 4, 0, 0)
+            btn.BackgroundColor3 = COLORS.TabInactive
+            btn.BackgroundTransparency = 0
+            btn.BorderSizePixel = 0
+            btn.Text = option
+            btn.TextColor3 = COLORS.Text
+            btn.TextSize = 13
+            btn.TextXAlignment = Enum.TextXAlignment.Left
+            btn.Font = Enum.Font.GothamSemibold
+            btn.Parent = dropdownList
+            
+            local btnCorner = Instance.new("UICorner")
+            btnCorner.CornerRadius = UDim.new(0, 3)
+            btnCorner.Parent = btn
+            
+            local checkMark = Instance.new("TextLabel")
+            checkMark.Size = UDim2.new(0, 20, 1, 0)
+            checkMark.Position = UDim2.new(1, -24, 0, 0)
+            checkMark.BackgroundTransparency = 1
+            checkMark.Text = "✓"
+            checkMark.TextColor3 = COLORS.Accent
+            checkMark.TextSize = 14
+            checkMark.TextXAlignment = Enum.TextXAlignment.Center
+            checkMark.Font = Enum.Font.GothamBold
+            checkMark.Visible = false
+            checkMark.Parent = btn
+            
+            dropdownItems[option] = btn
+            
+            btn.MouseButton1Click:Connect(function()
+                if multiSelect then
+                    selected[option] = not selected[option]
+                    checkMark.Visible = selected[option]
+                    updateSelectedText()
+                else
+                    selected = option
+                    for opt, item in pairs(dropdownItems) do
+                        item.BackgroundColor3 = COLORS.TabInactive
+                        item.TextColor3 = COLORS.Text
+                    end
+                    btn.BackgroundColor3 = COLORS.Accent
+                    btn.TextColor3 = COLORS.Text
+                    updateSelectedText()
+                    isOpen = false
+                    dropdownList.Visible = false
+                    arrow.Text = "▼"
+                    updateListSize()
+                end
+            end)
+        end
+        
+        if not multiSelect then
+            for opt, item in pairs(dropdownItems) do
+                if opt == defaultOption then
+                    item.BackgroundColor3 = COLORS.Accent
+                    item.TextColor3 = COLORS.Text
+                end
+            end
+        end
+        
+        arrow.MouseButton1Click:Connect(function()
+            isOpen = not isOpen
+            dropdownList.Visible = isOpen
+            arrow.Text = isOpen and "▲" or "▼"
+            updateListSize()
+        end)
+        
+        updateSelectedText()
+        updateListSize()
+        
+        return {
+            GetSelected = function()
+                if multiSelect then
+                    local result = {}
+                    for opt, val in pairs(selected) do
+                        if val then table.insert(result, opt) end
+                    end
+                    return result
+                else
+                    return selected
+                end
+            end,
+            SetSelected = function(newValue)
+                if multiSelect then
+                    selected = {}
+                    for _, opt in ipairs(newValue) do
+                        selected[opt] = true
+                    end
+                    for opt, item in pairs(dropdownItems) do
+                        item.BackgroundColor3 = COLORS.TabInactive
+                        item.TextColor3 = COLORS.Text
+                    end
+                    for opt, item in pairs(dropdownItems) do
+                        if selected[opt] then
+                            item.BackgroundColor3 = COLORS.Accent
+                            item.TextColor3 = COLORS.Text
+                        end
+                    end
+                    updateSelectedText()
+                else
+                    selected = newValue
+                    for opt, item in pairs(dropdownItems) do
+                        item.BackgroundColor3 = COLORS.TabInactive
+                        item.TextColor3 = COLORS.Text
+                    end
+                    if dropdownItems[newValue] then
+                        dropdownItems[newValue].BackgroundColor3 = COLORS.Accent
+                        dropdownItems[newValue].TextColor3 = COLORS.Text
+                    end
+                    updateSelectedText()
+                end
+            end
+        }
+    end
+    
+    -- === СТРАНИЦЫ ===
     function UIFramework:CreatePage(name)
         local pageFrame = Instance.new("Frame")
         pageFrame.Name = name
@@ -165,7 +624,7 @@ local function createMainFrame(title)
         pageFrame.Parent = pagesContainer
         
         local pageLayout = Instance.new("UIListLayout")
-        pageLayout.Padding = UDim.new(0, 8)
+        pageLayout.Padding = UDim.new(0, 4)
         pageLayout.SortOrder = Enum.SortOrder.LayoutOrder
         pageLayout.Parent = pageFrame
         
@@ -259,7 +718,11 @@ local function createMainFrame(title)
         CreatePage = UIFramework.CreatePage,
         SwitchPage = UIFramework.SwitchPage,
         Pages = pages,
-        ScreenGui = screenGui
+        ScreenGui = screenGui,
+        CreateToggleWithBind = UIFramework.CreateToggleWithBind,
+        CreateToggle = UIFramework.CreateToggle,
+        CreateSlider = UIFramework.CreateSlider,
+        CreateDropdown = UIFramework.CreateDropdown
     }
 end
 
