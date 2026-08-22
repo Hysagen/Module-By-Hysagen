@@ -54,9 +54,10 @@ local function createMainFrame(title)
     screenGui.ResetOnSpawn = false
     screenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
     
-    -- Загружаем сохранённый масштаб
+    -- Загружаем сохранённые настройки
     local settings = loadSettings()
     local savedScale = settings and settings.scale or "3:4"
+    local savedToggleKey = settings and settings.toggleKey or "RightControl"
     
     local currentScale = nil
     for _, s in ipairs(SCALES) do
@@ -77,6 +78,7 @@ local function createMainFrame(title)
     mainFrame.BackgroundTransparency = 0
     mainFrame.BorderSizePixel = 0
     mainFrame.Parent = screenGui
+    mainFrame.Visible = true
     
     local mainCorner = Instance.new("UICorner")
     mainCorner.CornerRadius = UDim.new(0, 8)
@@ -153,6 +155,8 @@ local function createMainFrame(title)
     
     local pages = {}
     local activePage = nil
+    local toggleKey = savedToggleKey
+    local uiRef = nil -- Ссылка на себя
     
     -- Функция обновления CanvasSize для страниц
     local function updatePagesCanvas()
@@ -335,6 +339,16 @@ local function createMainFrame(title)
             bottomContainer.Position = UDim2.new(0, 8, 0, 0)
             bottomContainer.BackgroundTransparency = 1
             bottomContainer.Parent = bottomScrolling
+        end
+        
+        -- Пересоздаём страницы если они уже были
+        for name, data in pairs(pages) do
+            if data and data.Frame then
+                data.Frame.Parent = currentScale.tabsLeft and pagesContainer or bottomContainer
+            end
+            if data and data.Button then
+                data.Button.Parent = currentScale.tabsLeft and leftScrolling or topTabsScrolling
+            end
         end
     end
     
@@ -1020,6 +1034,56 @@ local function createMainFrame(title)
         updatePagesCanvas()
     end
     
+    -- === НАСТРОЙКИ ===
+    -- Создаём страницу настроек
+    local settingsPage, settingsLayout = UIFramework:CreatePage("Настройки")
+    
+    -- Выбор масштаба
+    local scaleDropdown = UIFramework:CreateDropdown(settingsPage, "Масштаб", {"3:4", "1:1", "1:2"}, currentScale.name, false)
+    
+    -- Отслеживаем изменение масштаба
+    local function onScaleChange()
+        local newScale = scaleDropdown:GetSelected()
+        if newScale ~= currentScale.name then
+            uiRef:SetScale(newScale)
+        end
+    end
+    
+    -- Вешаем на клик по дропдауну (костыль, но работает)
+    local oldSetSelected = scaleDropdown.SetSelected
+    scaleDropdown.SetSelected = function(self, newValue)
+        oldSetSelected(self, newValue)
+        onScaleChange()
+    end
+    
+    -- Клавиша для открытия/закрытия
+    local keyOptions = {"RightControl", "LeftControl", "RightShift", "LeftShift", "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12"}
+    local keyDropdown = UIFramework:CreateDropdown(settingsPage, "Клавиша открытия", keyOptions, toggleKey, false)
+    
+    local function onKeyChange()
+        local newKey = keyDropdown:GetSelected()
+        if newKey and newKey ~= toggleKey then
+            toggleKey = newKey
+            saveSettings({scale = currentScale.name, toggleKey = toggleKey})
+        end
+    end
+    
+    local oldKeySetSelected = keyDropdown.SetSelected
+    keyDropdown.SetSelected = function(self, newValue)
+        oldKeySetSelected(self, newValue)
+        onKeyChange()
+    end
+    
+    -- Бинд на клавишу для открытия/закрытия
+    local function onToggleKey(input, gameProcessed)
+        if gameProcessed then return end
+        if input.KeyCode == Enum.KeyCode[toggleKey] then
+            mainFrame.Visible = not mainFrame.Visible
+        end
+    end
+    
+    game:GetService("UserInputService").InputBegan:Connect(onToggleKey)
+    
     -- Перетаскивание
     local dragging = false
     local dragStart, startPos
@@ -1048,7 +1112,8 @@ local function createMainFrame(title)
         end
     end)
     
-    return {
+    -- Сохраняем ссылку на себя
+    uiRef = {
         MainFrame = mainFrame,
         TopBar = topBar,
         Container = container,
@@ -1061,20 +1126,19 @@ local function createMainFrame(title)
         CreateSlider = UIFramework.CreateSlider,
         CreateDropdown = UIFramework.CreateDropdown,
         UpdatePagesCanvas = updatePagesCanvas,
-        -- Функция для смены масштаба
         SetScale = function(scaleName)
             for _, s in ipairs(SCALES) do
                 if s.name == scaleName then
                     currentScale = s
                     mainFrame.Size = UDim2.new(0, s.width, 0, s.height)
                     mainFrame.Position = UDim2.new(0.5, -s.width/2, 0.5, -s.height/2)
-                    buildInterface()
-                    -- Пересоздаём страницы
+                    -- Сохраняем страницы
                     local pagesCopy = {}
                     for name, data in pairs(pages) do
                         pagesCopy[name] = data
                     end
                     pages = {}
+                    buildInterface()
                     for name, data in pairs(pagesCopy) do
                         data.Frame.Parent = currentScale.tabsLeft and pagesContainer or bottomContainer
                         data.Button.Parent = currentScale.tabsLeft and leftScrolling or topTabsScrolling
@@ -1086,8 +1150,7 @@ local function createMainFrame(title)
                         end
                     end
                     updatePagesCanvas()
-                    -- Сохраняем
-                    saveSettings({scale = scaleName})
+                    saveSettings({scale = scaleName, toggleKey = toggleKey})
                     return true
                 end
             end
@@ -1098,8 +1161,17 @@ local function createMainFrame(title)
         end,
         GetScales = function()
             return SCALES
+        end,
+        GetToggleKey = function()
+            return toggleKey
+        end,
+        SetToggleKey = function(newKey)
+            toggleKey = newKey
+            saveSettings({scale = currentScale.name, toggleKey = toggleKey})
         end
     }
+    
+    return uiRef
 end
 
 function UIFramework.New(title)
