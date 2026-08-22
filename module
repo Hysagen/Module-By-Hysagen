@@ -497,7 +497,7 @@ local function createMainFrame(title)
         listLayout.SortOrder = Enum.SortOrder.LayoutOrder
         listLayout.Parent = dropdownList
         
-        -- Локальные переменные для этого дропдауна
+        -- Локальные переменные
         local selected = {}
         local dropdownItems = {}
         local isOpen = false
@@ -533,7 +533,7 @@ local function createMainFrame(title)
             end
         end
         
-        -- Создаём кнопки для каждого варианта
+        -- СОЗДАЁМ КНОПКИ ДЛЯ КАЖДОГО ВАРИАНТА
         for _, option in ipairs(options) do
             local btn = Instance.new("TextButton")
             btn.Size = UDim2.new(1, -8, 0, 28)
@@ -564,12 +564,13 @@ local function createMainFrame(title)
             checkMark.Visible = false
             checkMark.Parent = btn
             
+            -- Сохраняем ссылку
             dropdownItems[option] = {
                 Button = btn,
                 CheckMark = checkMark
             }
             
-            -- Локальная функция для этой кнопки
+            -- Клик по варианту
             btn.MouseButton1Click:Connect(function()
                 if multiSelect then
                     selected[option] = not selected[option]
@@ -602,7 +603,7 @@ local function createMainFrame(title)
             end
         end
         
-        -- Стрелка открывает/закрывает ТОЛЬКО ЭТОТ дропдаун
+        -- Стрелка открывает/закрывает
         arrow.MouseButton1Click:Connect(function()
             isOpen = not isOpen
             dropdownList.Visible = isOpen
@@ -610,8 +611,9 @@ local function createMainFrame(title)
             updateListSize()
         end)
         
-        updateSelectedText()
+        -- ОБНОВЛЯЕМ РАЗМЕРЫ И ТЕКСТ
         updateListSize()
+        updateSelectedText()
         
         return {
             GetSelected = function()
