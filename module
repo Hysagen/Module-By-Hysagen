@@ -413,7 +413,7 @@ local function createMainFrame(title)
         }
     end
     
-    -- === 4) КНОПКА-СПИСОК (ПЕРЕПИСАНА С НУЛЯ) ===
+    -- === 4) КНОПКА-СПИСОК ===
     function UIFramework:CreateDropdown(page, label, options, defaultOption, multiSelect)
         multiSelect = multiSelect or false
         
@@ -481,12 +481,18 @@ local function createMainFrame(title)
         local function updateMainText()
             if multiSelect then
                 local count = 0
-                for _, v in pairs(selected) do
-                    if v then count = count + 1 end
+                if type(selected) == "table" then
+                    for _, v in pairs(selected) do
+                        if v then count = count + 1 end
+                    end
                 end
                 mainBtn.Text = label .. ": " .. (count > 0 and ("Выбрано " .. count) or "Ничего не выбрано")
             else
-                mainBtn.Text = label .. ": " .. (selected or "Выберите...")
+                if type(selected) == "table" then
+                    mainBtn.Text = label .. ": Выберите..."
+                else
+                    mainBtn.Text = label .. ": " .. (selected or "Выберите...")
+                end
             end
         end
         
@@ -598,8 +604,10 @@ local function createMainFrame(title)
             GetSelected = function()
                 if multiSelect then
                     local result = {}
-                    for opt, val in pairs(selected) do
-                        if val then table.insert(result, opt) end
+                    if type(selected) == "table" then
+                        for opt, val in pairs(selected) do
+                            if val then table.insert(result, opt) end
+                        end
                     end
                     return result
                 else
@@ -609,14 +617,19 @@ local function createMainFrame(title)
             SetSelected = function(newValue)
                 if multiSelect then
                     selected = {}
-                    for _, opt in ipairs(newValue) do
-                        selected[opt] = true
+                    if type(newValue) == "table" then
+                        for _, opt in ipairs(newValue) do
+                            selected[opt] = true
+                        end
                     end
                     for opt, data in pairs(buttons) do
                         data.Check.Visible = selected[opt] or false
                     end
                     updateMainText()
                 else
+                    if type(newValue) == "table" then
+                        newValue = nil
+                    end
                     selected = newValue
                     for opt, data in pairs(buttons) do
                         data.Button.BackgroundColor3 = COLORS.TabInactive
