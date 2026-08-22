@@ -17,23 +17,16 @@ local function createMainFrame(title)
     screenGui.ResetOnSpawn = false
     screenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
     
-    -- Главное окно
+    -- ОСНОВНОЙ КОНТЕЙНЕР (прозрачный, только для позиционирования)
     local mainFrame = Instance.new("Frame")
     mainFrame.Name = "MainFrame"
     mainFrame.Size = UDim2.new(0, 600, 0, 400)
     mainFrame.Position = UDim2.new(0.5, -300, 0.5, -200)
-    mainFrame.BackgroundColor3 = COLORS.Background
-    mainFrame.BackgroundTransparency = 0
+    mainFrame.BackgroundTransparency = 1
     mainFrame.BorderSizePixel = 0
-    mainFrame.ClipsDescendants = true
     mainFrame.Parent = screenGui
     
-    -- Скругление всех углов у mainFrame
-    local mainCorner = Instance.new("UICorner")
-    mainCorner.CornerRadius = UDim.new(0, 8)
-    mainCorner.Parent = mainFrame
-    
-    -- Тень
+    -- ТЕНЬ
     local shadow = Instance.new("Frame")
     shadow.Size = UDim2.new(1, 0, 1, 0)
     shadow.Position = UDim2.new(0, 8, 0, 8)
@@ -47,21 +40,34 @@ local function createMainFrame(title)
     shadowCorner.CornerRadius = UDim.new(0, 8)
     shadowCorner.Parent = shadow
     
-    -- Верхняя панель
+    -- ФОН (именно здесь скругление)
+    local background = Instance.new("Frame")
+    background.Name = "Background"
+    background.Size = UDim2.new(1, 0, 1, 0)
+    background.BackgroundColor3 = COLORS.Background
+    background.BackgroundTransparency = 0
+    background.BorderSizePixel = 0
+    background.Parent = mainFrame
+    
+    local bgCorner = Instance.new("UICorner")
+    bgCorner.CornerRadius = UDim.new(0, 8)
+    bgCorner.Parent = background
+    
+    -- ВЕРХНЯЯ ПАНЕЛЬ
     local topBar = Instance.new("Frame")
     topBar.Name = "TopBar"
     topBar.Size = UDim2.new(1, 0, 0, 36)
     topBar.BackgroundColor3 = COLORS.TopBar
     topBar.BackgroundTransparency = 0
     topBar.BorderSizePixel = 0
-    topBar.Parent = mainFrame
+    topBar.Parent = background
     
-    -- Отдельный UICorner для topBar (только верхние углы)
+    -- Скругление верхней панели (только верх)
     local topCorner = Instance.new("UICorner")
     topCorner.CornerRadius = UDim.new(0, 8)
     topCorner.Parent = topBar
     
-    -- Маскируем нижние углы topBar (чтобы не перекрывали mainFrame)
+    -- Маскируем нижнюю часть topBar (чтобы не перекрывала скругление фона)
     local topMask = Instance.new("Frame")
     topMask.Size = UDim2.new(1, 0, 0, 8)
     topMask.Position = UDim2.new(0, 0, 1, -8)
@@ -96,30 +102,29 @@ local function createMainFrame(title)
         mainFrame.Visible = false
     end)
     
-    -- Основной контейнер
+    -- КОНТЕЙНЕР ДЛЯ ЛЕВОЙ И ПРАВОЙ ПАНЕЛИ
     local container = Instance.new("Frame")
     container.Name = "Container"
     container.Size = UDim2.new(1, 0, 1, -36)
     container.Position = UDim2.new(0, 0, 0, 36)
     container.BackgroundTransparency = 1
-    container.Parent = mainFrame
+    container.Parent = background
     
-    -- ЛЕВАЯ ПАНЕЛЬ (с отступами)
+    -- ЛЕВАЯ ПАНЕЛЬ
     local leftPanel = Instance.new("Frame")
     leftPanel.Name = "LeftPanel"
     leftPanel.Size = UDim2.new(0, 180, 1, 0)
-    leftPanel.Position = UDim2.new(0, 0, 0, 0)
     leftPanel.BackgroundColor3 = Color3.fromRGB(40, 40, 48)
     leftPanel.BackgroundTransparency = 0
     leftPanel.BorderSizePixel = 0
     leftPanel.Parent = container
     
-    -- Скругление для левой панели (только левые углы)
+    -- Скругление левой панели (все углы)
     local leftCorner = Instance.new("UICorner")
     leftCorner.CornerRadius = UDim.new(0, 8)
     leftCorner.Parent = leftPanel
     
-    -- Маскируем правую сторону левой панели (чтобы стык с правой панелью был ровным)
+    -- Маскируем правую часть левой панели
     local leftMask = Instance.new("Frame")
     leftMask.Size = UDim2.new(0, 8, 1, 0)
     leftMask.Position = UDim2.new(1, -8, 0, 0)
@@ -153,12 +158,12 @@ local function createMainFrame(title)
     rightPanel.BorderSizePixel = 0
     rightPanel.Parent = container
     
-    -- Скругление для правой панели (только правые углы)
+    -- Скругление правой панели (все углы)
     local rightCorner = Instance.new("UICorner")
     rightCorner.CornerRadius = UDim.new(0, 8)
     rightCorner.Parent = rightPanel
     
-    -- Маскируем левую сторону правой панели
+    -- Маскируем левую часть правой панели
     local rightMask = Instance.new("Frame")
     rightMask.Size = UDim2.new(0, 8, 1, 0)
     rightMask.Position = UDim2.new(0, 0, 0, 0)
@@ -167,7 +172,7 @@ local function createMainFrame(title)
     rightMask.BorderSizePixel = 0
     rightMask.Parent = rightPanel
     
-    -- Контейнер для страниц
+    -- КОНТЕЙНЕР ДЛЯ СТРАНИЦ (с отступами)
     local pagesContainer = Instance.new("Frame")
     pagesContainer.Name = "PagesContainer"
     pagesContainer.Size = UDim2.new(1, -16, 1, -16)
@@ -175,6 +180,7 @@ local function createMainFrame(title)
     pagesContainer.BackgroundTransparency = 1
     pagesContainer.Parent = rightPanel
     
+    -- Словарь для хранения страниц
     local pages = {}
     local activePage = nil
     
@@ -193,7 +199,7 @@ local function createMainFrame(title)
         pageLayout.SortOrder = Enum.SortOrder.LayoutOrder
         pageLayout.Parent = pageFrame
         
-        -- Кнопка в левой панели с отступом слева
+        -- Кнопка в левой панели
         local tabBtn = Instance.new("TextButton")
         tabBtn.Name = name .. "Tab"
         tabBtn.Size = UDim2.new(1, -16, 0, 36)
@@ -201,13 +207,18 @@ local function createMainFrame(title)
         tabBtn.BackgroundColor3 = COLORS.TabInactive
         tabBtn.BackgroundTransparency = 0
         tabBtn.BorderSizePixel = 0
-        tabBtn.Text = "  " .. name
+        tabBtn.Text = name
         tabBtn.TextColor3 = COLORS.TextDim
         tabBtn.TextSize = 14
         tabBtn.TextXAlignment = Enum.TextXAlignment.Left
         tabBtn.TextTruncate = Enum.TextTruncate.AtEnd
         tabBtn.Font = Enum.Font.GothamSemibold
         tabBtn.Parent = leftScrolling
+        
+        -- Отступ для текста через UIPadding
+        local textPad = Instance.new("UIPadding")
+        textPad.PaddingLeft = UDim.new(0, 12)
+        textPad.Parent = tabBtn
         
         local tabCorner = Instance.new("UICorner")
         tabCorner.CornerRadius = UDim.new(0, 4)
