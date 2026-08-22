@@ -175,18 +175,11 @@ local function createMainFrame(title)
         end
         
         local totalHeight = 16
-        local hasVisible = false
         for _, data in pairs(pages) do
             if data and data.Frame and data.Frame.Visible then
-                hasVisible = true
                 totalHeight = totalHeight + data.Frame.Size.Y.Offset + 4
             end
         end
-        
-        if not hasVisible then
-            totalHeight = 16
-        end
-        
         pagesScrolling.CanvasSize = UDim2.new(0, 0, 0, totalHeight)
     end
     
@@ -459,7 +452,7 @@ local function createMainFrame(title)
         }
     end
     
-    -- === 4) КНОПКА-СПИСОК ===
+    -- === 4) КНОПКА-СПИСОК (С ScrollingFrame внутри) ===
     function UIFramework:CreateDropdown(page, label, options, defaultOption, multiSelect)
         multiSelect = multiSelect or false
         
@@ -498,6 +491,7 @@ local function createMainFrame(title)
         arrow.Parent = mainBtn
         arrow.ZIndex = 2
         
+        -- Фрейм для списка
         local listFrame = Instance.new("Frame")
         listFrame.Size = UDim2.new(1, -16, 0, 0)
         listFrame.Position = UDim2.new(0, 8, 0, 40)
@@ -507,6 +501,7 @@ local function createMainFrame(title)
         listFrame.Visible = false
         listFrame.Parent = container
         listFrame.ZIndex = 10
+        listFrame.ClipsDescendants = true
         
         local listCorner = Instance.new("UICorner")
         listCorner.CornerRadius = UDim.new(0, 4)
@@ -525,10 +520,21 @@ local function createMainFrame(title)
         listShadowCorner.CornerRadius = UDim.new(0, 4)
         listShadowCorner.Parent = listShadow
         
+        -- ScrollingFrame внутри списка
+        local listScrolling = Instance.new("ScrollingFrame")
+        listScrolling.Size = UDim2.new(1, 0, 1, 0)
+        listScrolling.BackgroundTransparency = 1
+        listScrolling.BorderSizePixel = 0
+        listScrolling.ScrollBarThickness = 4
+        listScrolling.ScrollBarImageColor3 = COLORS.Accent
+        listScrolling.CanvasSize = UDim2.new(0, 0, 0, 0)
+        listScrolling.Parent = listFrame
+        listScrolling.ZIndex = 10
+        
         local listLayout = Instance.new("UIListLayout")
         listLayout.Padding = UDim.new(0, 2)
         listLayout.SortOrder = Enum.SortOrder.LayoutOrder
-        listLayout.Parent = listFrame
+        listLayout.Parent = listScrolling
         
         local selected = defaultOption
         local isOpen = false
@@ -557,8 +563,10 @@ local function createMainFrame(title)
             for _ in pairs(buttons) do
                 count = count + 1
             end
-            listFrame.Size = UDim2.new(1, -16, 0, math.min(count * 30 + 4, 200))
-            container.Size = UDim2.new(1, 0, 0, 44 + (isOpen and listFrame.Size.Y.Offset or 0))
+            local maxHeight = math.min(count * 30 + 4, 150)
+            listScrolling.CanvasSize = UDim2.new(0, 0, 0, count * 30 + 4)
+            listFrame.Size = UDim2.new(1, -16, 0, maxHeight)
+            container.Size = UDim2.new(1, 0, 0, 44 + (isOpen and maxHeight or 0))
             task.wait(0.05)
             updatePagesCanvas()
         end
@@ -575,7 +583,7 @@ local function createMainFrame(title)
             btn.TextSize = 13
             btn.TextXAlignment = Enum.TextXAlignment.Left
             btn.Font = Enum.Font.GothamSemibold
-            btn.Parent = listFrame
+            btn.Parent = listScrolling
             btn.ZIndex = 10
             
             local btnCorner = Instance.new("UICorner")
