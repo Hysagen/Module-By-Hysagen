@@ -430,7 +430,7 @@ local function createMainFrame(title)
         mainBtn.BackgroundColor3 = COLORS.TabInactive
         mainBtn.BackgroundTransparency = 0
         mainBtn.BorderSizePixel = 0
-        mainBtn.Text = label .. ": " .. (defaultOption or "Выберите...")
+        mainBtn.Text = label .. ": " .. tostring(defaultOption or "Выберите...")
         mainBtn.TextColor3 = COLORS.Text
         mainBtn.TextSize = 13
         mainBtn.TextXAlignment = Enum.TextXAlignment.Left
@@ -491,7 +491,7 @@ local function createMainFrame(title)
                 if type(selected) == "table" then
                     mainBtn.Text = label .. ": Выберите..."
                 else
-                    mainBtn.Text = label .. ": " .. (selected or "Выберите...")
+                    mainBtn.Text = label .. ": " .. tostring(selected or "Выберите...")
                 end
             end
         end
