@@ -413,127 +413,94 @@ local function createMainFrame(title)
         }
     end
     
-    -- === 4) КНОПКА-СПИСОК ===
+    -- === 4) КНОПКА-СПИСОК (ПЕРЕПИСАНА С НУЛЯ) ===
     function UIFramework:CreateDropdown(page, label, options, defaultOption, multiSelect)
-        local container = createElementContainer(page)
+        multiSelect = multiSelect or false
         
-        -- Основной фрейм дропдауна
-        local dropdownFrame = Instance.new("Frame")
-        dropdownFrame.Size = UDim2.new(1, -16, 0, 36)
-        dropdownFrame.Position = UDim2.new(0, 8, 0, 4)
-        dropdownFrame.BackgroundColor3 = COLORS.TabInactive
-        dropdownFrame.BackgroundTransparency = 0
-        dropdownFrame.BorderSizePixel = 0
-        dropdownFrame.Parent = container
+        -- Контейнер для дропдауна
+        local container = Instance.new("Frame")
+        container.Size = UDim2.new(1, 0, 0, 44)
+        container.BackgroundTransparency = 1
+        container.Parent = page
         
-        local corner = Instance.new("UICorner")
-        corner.CornerRadius = UDim.new(0, 4)
-        corner.Parent = dropdownFrame
+        -- Основная кнопка
+        local mainBtn = Instance.new("TextButton")
+        mainBtn.Size = UDim2.new(1, -16, 0, 36)
+        mainBtn.Position = UDim2.new(0, 8, 0, 4)
+        mainBtn.BackgroundColor3 = COLORS.TabInactive
+        mainBtn.BackgroundTransparency = 0
+        mainBtn.BorderSizePixel = 0
+        mainBtn.Text = label .. ": " .. (defaultOption or "Выберите...")
+        mainBtn.TextColor3 = COLORS.Text
+        mainBtn.TextSize = 13
+        mainBtn.TextXAlignment = Enum.TextXAlignment.Left
+        mainBtn.Font = Enum.Font.GothamSemibold
+        mainBtn.Parent = container
         
-        -- Лейбл
-        local labelText = Instance.new("TextLabel")
-        labelText.Size = UDim2.new(0.4, 0, 1, 0)
-        labelText.Position = UDim2.new(0, 8, 0, 0)
-        labelText.BackgroundTransparency = 1
-        labelText.Text = label
-        labelText.TextColor3 = COLORS.Text
-        labelText.TextSize = 13
-        labelText.TextXAlignment = Enum.TextXAlignment.Left
-        labelText.Font = Enum.Font.GothamSemibold
-        labelText.Parent = dropdownFrame
+        local mainCorner = Instance.new("UICorner")
+        mainCorner.CornerRadius = UDim.new(0, 4)
+        mainCorner.Parent = mainBtn
         
-        -- Выбранный текст
-        local selectedText = Instance.new("TextLabel")
-        selectedText.Size = UDim2.new(0.4, 0, 1, 0)
-        selectedText.Position = UDim2.new(0.45, 0, 0, 0)
-        selectedText.BackgroundTransparency = 1
-        selectedText.Text = "Выберите..."
-        selectedText.TextColor3 = COLORS.Accent
-        selectedText.TextSize = 13
-        selectedText.TextXAlignment = Enum.TextXAlignment.Right
-        selectedText.Font = Enum.Font.GothamBold
-        selectedText.Parent = dropdownFrame
-        
-        -- Стрелка
-        local arrow = Instance.new("TextButton")
-        arrow.Size = UDim2.new(0, 30, 0, 30)
-        arrow.Position = UDim2.new(1, -36, 0.5, -15)
+        -- Стрелка справа
+        local arrow = Instance.new("TextLabel")
+        arrow.Size = UDim2.new(0, 30, 0, 36)
+        arrow.Position = UDim2.new(1, -36, 0, 0)
         arrow.BackgroundTransparency = 1
         arrow.Text = "▼"
         arrow.TextColor3 = COLORS.TextDim
         arrow.TextSize = 14
+        arrow.TextXAlignment = Enum.TextXAlignment.Center
         arrow.Font = Enum.Font.GothamBold
-        arrow.Parent = dropdownFrame
+        arrow.Parent = mainBtn
         
         -- Выпадающий список
-        local dropdownList = Instance.new("Frame")
-        dropdownList.Size = UDim2.new(1, 0, 0, 0)
-        dropdownList.Position = UDim2.new(0, 0, 0, 36)
-        dropdownList.BackgroundColor3 = COLORS.TabInactive
-        dropdownList.BackgroundTransparency = 0
-        dropdownList.BorderSizePixel = 0
-        dropdownList.Visible = false
-        dropdownList.Parent = dropdownFrame
+        local listFrame = Instance.new("Frame")
+        listFrame.Size = UDim2.new(1, -16, 0, 0)
+        listFrame.Position = UDim2.new(0, 8, 0, 40)
+        listFrame.BackgroundColor3 = COLORS.TabInactive
+        listFrame.BackgroundTransparency = 0
+        listFrame.BorderSizePixel = 0
+        listFrame.Visible = false
+        listFrame.Parent = container
         
         local listCorner = Instance.new("UICorner")
         listCorner.CornerRadius = UDim.new(0, 4)
-        listCorner.Parent = dropdownList
-        
-        local listShadow = Instance.new("Frame")
-        listShadow.Size = UDim2.new(1, 0, 1, 0)
-        listShadow.Position = UDim2.new(0, 4, 0, 4)
-        listShadow.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-        listShadow.BackgroundTransparency = 0.5
-        listShadow.BorderSizePixel = 0
-        listShadow.ZIndex = 0
-        listShadow.Parent = dropdownList
-        
-        local listShadowCorner = Instance.new("UICorner")
-        listShadowCorner.CornerRadius = UDim.new(0, 4)
-        listShadowCorner.Parent = listShadow
+        listCorner.Parent = listFrame
         
         local listLayout = Instance.new("UIListLayout")
         listLayout.Padding = UDim.new(0, 2)
         listLayout.SortOrder = Enum.SortOrder.LayoutOrder
-        listLayout.Parent = dropdownList
+        listLayout.Parent = listFrame
         
         -- Локальные переменные
-        local selected = {}
-        local dropdownItems = {}
+        local selected = defaultOption
         local isOpen = false
+        local buttons = {}
         
-        if multiSelect then
-            selected = {}
-        else
-            selected = defaultOption
-        end
-        
-        local function updateListSize()
-            local count = 0
-            for _ in pairs(dropdownItems) do
-                count = count + 1
-            end
-            dropdownList.Size = UDim2.new(1, 0, 0, math.min(count * 30 + 4, 200))
-            dropdownList.ClipsDescendants = true
-        end
-        
-        local function updateSelectedText()
+        -- Функция обновления текста на кнопке
+        local function updateMainText()
             if multiSelect then
                 local count = 0
-                for _, val in pairs(selected) do
-                    if val then count = count + 1 end
+                for _, v in pairs(selected) do
+                    if v then count = count + 1 end
                 end
-                selectedText.Text = count > 0 and ("Выбрано: " .. count) or "Ничего не выбрано"
+                mainBtn.Text = label .. ": " .. (count > 0 and ("Выбрано " .. count) or "Ничего не выбрано")
             else
-                if type(selected) == "table" then
-                    selectedText.Text = "Выберите..."
-                else
-                    selectedText.Text = selected or "Выберите..."
-                end
+                mainBtn.Text = label .. ": " .. (selected or "Выберите...")
             end
         end
         
-        -- СОЗДАЁМ КНОПКИ ДЛЯ КАЖДОГО ВАРИАНТА
+        -- Функция обновления размера списка
+        local function updateListSize()
+            local count = 0
+            for _ in pairs(buttons) do
+                count = count + 1
+            end
+            listFrame.Size = UDim2.new(1, -16, 0, math.min(count * 30 + 4, 200))
+            container.Size = UDim2.new(1, 0, 0, 44 + (isOpen and listFrame.Size.Y.Offset or 0))
+        end
+        
+        -- Создаём кнопки для каждого варианта
         for _, option in ipairs(options) do
             local btn = Instance.new("TextButton")
             btn.Size = UDim2.new(1, -8, 0, 28)
@@ -546,74 +513,86 @@ local function createMainFrame(title)
             btn.TextSize = 13
             btn.TextXAlignment = Enum.TextXAlignment.Left
             btn.Font = Enum.Font.GothamSemibold
-            btn.Parent = dropdownList
+            btn.Parent = listFrame
             
             local btnCorner = Instance.new("UICorner")
             btnCorner.CornerRadius = UDim.new(0, 3)
             btnCorner.Parent = btn
             
-            local checkMark = Instance.new("TextLabel")
-            checkMark.Size = UDim2.new(0, 20, 1, 0)
-            checkMark.Position = UDim2.new(1, -24, 0, 0)
-            checkMark.BackgroundTransparency = 1
-            checkMark.Text = "✓"
-            checkMark.TextColor3 = COLORS.Accent
-            checkMark.TextSize = 14
-            checkMark.TextXAlignment = Enum.TextXAlignment.Center
-            checkMark.Font = Enum.Font.GothamBold
-            checkMark.Visible = false
-            checkMark.Parent = btn
+            -- Галочка
+            local check = Instance.new("TextLabel")
+            check.Size = UDim2.new(0, 20, 1, 0)
+            check.Position = UDim2.new(1, -24, 0, 0)
+            check.BackgroundTransparency = 1
+            check.Text = "✓"
+            check.TextColor3 = COLORS.Accent
+            check.TextSize = 14
+            check.TextXAlignment = Enum.TextXAlignment.Center
+            check.Font = Enum.Font.GothamBold
+            check.Visible = false
+            check.Parent = btn
             
-            -- Сохраняем ссылку
-            dropdownItems[option] = {
+            buttons[option] = {
                 Button = btn,
-                CheckMark = checkMark
+                Check = check
             }
             
             -- Клик по варианту
             btn.MouseButton1Click:Connect(function()
                 if multiSelect then
+                    if type(selected) ~= "table" then
+                        selected = {}
+                    end
                     selected[option] = not selected[option]
-                    checkMark.Visible = selected[option]
-                    updateSelectedText()
+                    check.Visible = selected[option]
+                    updateMainText()
                 else
                     selected = option
-                    for opt, data in pairs(dropdownItems) do
+                    for opt, data in pairs(buttons) do
                         data.Button.BackgroundColor3 = COLORS.TabInactive
                         data.Button.TextColor3 = COLORS.Text
+                        data.Check.Visible = false
                     end
                     btn.BackgroundColor3 = COLORS.Accent
                     btn.TextColor3 = COLORS.Text
-                    updateSelectedText()
-                    -- Закрываем после выбора
+                    check.Visible = true
+                    updateMainText()
+                    -- Закрываем
                     isOpen = false
-                    dropdownList.Visible = false
+                    listFrame.Visible = false
                     arrow.Text = "▼"
+                    updateListSize()
                 end
             end)
         end
         
         -- Выделяем дефолтный вариант
         if not multiSelect then
-            for opt, data in pairs(dropdownItems) do
+            for opt, data in pairs(buttons) do
                 if opt == defaultOption then
                     data.Button.BackgroundColor3 = COLORS.Accent
                     data.Button.TextColor3 = COLORS.Text
+                    data.Check.Visible = true
+                end
+            end
+        elseif type(defaultOption) == "table" then
+            for opt, data in pairs(buttons) do
+                if defaultOption[opt] then
+                    data.Check.Visible = true
                 end
             end
         end
         
-        -- Стрелка открывает/закрывает
-        arrow.MouseButton1Click:Connect(function()
+        -- Клик по основной кнопке (открыть/закрыть)
+        mainBtn.MouseButton1Click:Connect(function()
             isOpen = not isOpen
-            dropdownList.Visible = isOpen
+            listFrame.Visible = isOpen
             arrow.Text = isOpen and "▲" or "▼"
             updateListSize()
         end)
         
-        -- ОБНОВЛЯЕМ РАЗМЕРЫ И ТЕКСТ
+        updateMainText()
         updateListSize()
-        updateSelectedText()
         
         return {
             GetSelected = function()
@@ -633,33 +612,23 @@ local function createMainFrame(title)
                     for _, opt in ipairs(newValue) do
                         selected[opt] = true
                     end
-                    for opt, data in pairs(dropdownItems) do
-                        data.Button.BackgroundColor3 = COLORS.TabInactive
-                        data.Button.TextColor3 = COLORS.Text
-                        data.CheckMark.Visible = false
+                    for opt, data in pairs(buttons) do
+                        data.Check.Visible = selected[opt] or false
                     end
-                    for opt, data in pairs(dropdownItems) do
-                        if selected[opt] then
-                            data.Button.BackgroundColor3 = COLORS.Accent
-                            data.Button.TextColor3 = COLORS.Text
-                            data.CheckMark.Visible = true
-                        end
-                    end
-                    updateSelectedText()
+                    updateMainText()
                 else
-                    if type(newValue) == "table" then
-                        newValue = options[1] or "Выберите..."
-                    end
                     selected = newValue
-                    for opt, data in pairs(dropdownItems) do
+                    for opt, data in pairs(buttons) do
                         data.Button.BackgroundColor3 = COLORS.TabInactive
                         data.Button.TextColor3 = COLORS.Text
+                        data.Check.Visible = false
                     end
-                    if dropdownItems[newValue] then
-                        dropdownItems[newValue].Button.BackgroundColor3 = COLORS.Accent
-                        dropdownItems[newValue].Button.TextColor3 = COLORS.Text
+                    if buttons[newValue] then
+                        buttons[newValue].Button.BackgroundColor3 = COLORS.Accent
+                        buttons[newValue].Button.TextColor3 = COLORS.Text
+                        buttons[newValue].Check.Visible = true
                     end
-                    updateSelectedText()
+                    updateMainText()
                 end
             end
         }
