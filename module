@@ -362,7 +362,6 @@ local function createMainFrame(title)
         fillCorner.CornerRadius = UDim.new(0, 2)
         fillCorner.Parent = fill
         
-        -- ПРОВЕРКА: если default это таблица или nil, ставим min
         if type(default) == "table" then
             default = min
         end
@@ -446,7 +445,7 @@ local function createMainFrame(title)
         selectedText.Size = UDim2.new(0.4, 0, 0, 20)
         selectedText.Position = UDim2.new(0.55, 0, 0, 2)
         selectedText.BackgroundTransparency = 1
-        selectedText.Text = defaultOption or "Выберите..."
+        selectedText.Text = "Выберите..."
         selectedText.TextColor3 = COLORS.Accent
         selectedText.TextSize = 13
         selectedText.TextXAlignment = Enum.TextXAlignment.Right
@@ -508,7 +507,11 @@ local function createMainFrame(title)
                 end
                 selectedText.Text = count > 0 and ("Выбрано: " .. count) or "Ничего не выбрано"
             else
-                selectedText.Text = selected or "Выберите..."
+                if type(selected) == "table" then
+                    selectedText.Text = "Выберите..."
+                else
+                    selectedText.Text = selected or "Выберите..."
+                end
             end
         end
         
@@ -620,6 +623,9 @@ local function createMainFrame(title)
                     end
                     updateSelectedText()
                 else
+                    if type(newValue) == "table" then
+                        newValue = options[1] or "Выберите..."
+                    end
                     selected = newValue
                     for opt, data in pairs(dropdownItems) do
                         data.Button.BackgroundColor3 = COLORS.TabInactive
