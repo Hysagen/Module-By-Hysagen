@@ -1,4 +1,4 @@
-print("karimgey")
+-- Название модуля: UIFramework
 local UIFramework = {}
 
 local COLORS = {
@@ -387,7 +387,7 @@ local function createMainFrame(title)
         sliderCorner.CornerRadius = UDim.new(0, 2)
         sliderCorner.Parent = slider
         
-        -- Заполнение
+        -- Заполнение (привязано к левому краю)
         local fill = Instance.new("Frame")
         fill.Size = UDim2.new(0.5, 0, 1, 0)
         fill.BackgroundColor3 = COLORS.Accent
@@ -399,20 +399,20 @@ local function createMainFrame(title)
         fillCorner.CornerRadius = UDim.new(0, 2)
         fillCorner.Parent = fill
         
-        -- Ручка (круглая точка)
+        -- Ручка (привязана к slider)
         local handle = Instance.new("Frame")
         handle.Size = UDim2.new(0, 16, 0, 16)
         handle.Position = UDim2.new(0.5, -8, 0.5, -8)
         handle.BackgroundColor3 = COLORS.Accent
         handle.BackgroundTransparency = 0
         handle.BorderSizePixel = 0
-        handle.Parent = fill
+        handle.Parent = slider
         
         local handleCorner = Instance.new("UICorner")
         handleCorner.CornerRadius = UDim.new(1, 0)
         handleCorner.Parent = handle
         
-        -- Обводка ручки (белая)
+        -- Обводка ручки
         local handleBorder = Instance.new("Frame")
         handleBorder.Size = UDim2.new(1, 0, 1, 0)
         handleBorder.BackgroundColor3 = COLORS.Text
@@ -437,6 +437,7 @@ local function createMainFrame(title)
             value = math.round(math.clamp(newValue, min, max))
             local percentage = (value - min) / (max - min)
             fill.Size = UDim2.new(percentage, 0, 1, 0)
+            handle.Position = UDim2.new(percentage, -8, 0.5, -8)
             valueLabel.Text = tostring(value)
         end
         
@@ -484,16 +485,15 @@ local function createMainFrame(title)
         
         -- Глобальные события
         local inputService = game:GetService("UserInputService")
-        local moveConnection = inputService.InputChanged:Connect(moveDrag)
-        local endConnection = inputService.InputEnded:Connect(endDrag)
+        inputService.InputChanged:Connect(moveDrag)
+        inputService.InputEnded:Connect(endDrag)
         
         task.wait(0.05)
         updatePagesCanvas()
         
         return {
             SetValue = updateSlider,
-            GetValue = function() return value end,
-            _connections = {moveConnection, endConnection}
+            GetValue = function() return value end
         }
     end
     
