@@ -21,6 +21,33 @@ local SCALES = {
     {name = "1:2", width = 700, height = 350, tabsLeft = false},
 }
 
+-- Функции для сохранения/загрузки
+local function saveSettings(settings)
+    if not writefile then return end
+    local success, err = pcall(function()
+        writefile("UIFramework_Settings.json", game:GetService("HttpService"):JSONEncode(settings))
+    end)
+    if not success then
+        warn("Failed to save settings: " .. tostring(err))
+    end
+end
+
+local function loadSettings()
+    if not readfile then return nil end
+    local success, data = pcall(function()
+        return readfile("UIFramework_Settings.json")
+    end)
+    if success and data then
+        local success2, decoded = pcall(function()
+            return game:GetService("HttpService"):JSONDecode(data)
+        end)
+        if success2 then
+            return decoded
+        end
+    end
+    return nil
+end
+
 local function createMainFrame(title)
     local screenGui = Instance.new("ScreenGui")
     screenGui.Name = "UIFramework"
@@ -28,7 +55,9 @@ local function createMainFrame(title)
     screenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
     
     -- Загружаем сохранённый масштаб
-    local savedScale = game:GetService("DataStoreService"):GetDataStore("UIFramework_Settings"):GetAsync("Scale") or "3:4"
+    local settings = loadSettings()
+    local savedScale = settings and settings.scale or "3:4"
+    
     local currentScale = nil
     for _, s in ipairs(SCALES) do
         if s.name == savedScale then
@@ -1041,9 +1070,15 @@ local function createMainFrame(title)
                     mainFrame.Position = UDim2.new(0.5, -s.width/2, 0.5, -s.height/2)
                     buildInterface()
                     -- Пересоздаём страницы
+                    local pagesCopy = {}
                     for name, data in pairs(pages) do
+                        pagesCopy[name] = data
+                    end
+                    pages = {}
+                    for name, data in pairs(pagesCopy) do
                         data.Frame.Parent = currentScale.tabsLeft and pagesContainer or bottomContainer
                         data.Button.Parent = currentScale.tabsLeft and leftScrolling or topTabsScrolling
+                        pages[name] = data
                         if currentScale.tabsLeft then
                             leftScrolling.CanvasSize = UDim2.new(0, 0, 0, leftScrolling.CanvasSize.Y.Offset + 40)
                         else
@@ -1052,8 +1087,7 @@ local function createMainFrame(title)
                     end
                     updatePagesCanvas()
                     -- Сохраняем
-                    local ds = game:GetService("DataStoreService"):GetDataStore("UIFramework_Settings")
-                    ds:SetAsync("Scale", scaleName)
+                    saveSettings({scale = scaleName})
                     return true
                 end
             end
