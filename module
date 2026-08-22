@@ -1,6 +1,6 @@
 --[[
     UI Module for Roblox Scripts
-    Version 1.1 (исправлена ошибка с метатаблицей)
+    Версия 2.0 – исправлен порядок определений методов
 ]]
 
 local UIModule = {}
@@ -10,7 +10,7 @@ local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
--- ============ Themes ============
+-- ============ Темы ============
 local Themes = {
     Dark = {
         Background = Color3.fromRGB(30, 30, 30),
@@ -71,7 +71,7 @@ local Themes = {
     },
 }
 
--- ============ Settings Storage ============
+-- ============ Хранилище настроек ============
 local defaultSettings = {
     Theme = "Dark",
     ToggleKey = "RightControl",
@@ -91,7 +91,7 @@ local function saveSettings(settings)
     _G.__UI_Settings = settings
 end
 
--- ============ Utility ============
+-- ============ Утилиты ============
 local function parseRatio(str)
     local parts = {}
     for part in str:gmatch("[^:]+") do
@@ -111,59 +111,9 @@ local function getKeyEnum(keyName)
     return nil
 end
 
--- ============ UIModule ============
-function UIModule.new(config)
-    config = config or {}
-    local settings = loadSettings()
-    if config.Settings then
-        for k, v in pairs(config.Settings) do
-            settings[k] = v
-        end
-        saveSettings(settings)
-    end
-
-    -- Исправленная метатаблица для доступа к методам
-    local self = setmetatable({}, { __index = UIModule })
-    self.config = config
-    self.settings = settings
-    self.tabs = {}
-    self.tabButtons = {}
-    self.tabPanels = {}
-    self.elements = {}
-    self.currentTab = nil
-    self.visible = true
-    self.toggleConnection = nil
-    self.theme = settings.Theme
-    self.isMobile = UserInputService.TouchEnabled
-
-    -- Устанавливаем тему до создания элементов
-    self.themeData = Themes[self.theme] or Themes.Dark
-
-    self:createGUI()
-    if config.Tabs then
-        for _, tabData in ipairs(config.Tabs) do
-            self:addTab(tabData.Name, tabData.Elements)
-        end
-    end
-    if not self.tabs["Settings"] then
-        self:addSettingsTab()
-    end
-    local firstTab = next(self.tabs)
-    if firstTab then
-        self:selectTab(firstTab)
-    end
-    self:setupToggleKey()
-    self:applyTheme(self.theme)
-    self:setVisible(true)
-
-    self.gui.AncestryChanged:Connect(function()
-        if not self.gui.Parent then
-            self:destroy()
-        end
-    end)
-
-    return self
-end
+-- ====================================================
+--            МЕТОДЫ UI (определены до new)
+-- ====================================================
 
 function UIModule:createGUI()
     local gui = Instance.new("ScreenGui")
@@ -850,6 +800,60 @@ function UIModule:destroy()
             end
         end
     end
+end
+
+-- ====================================================
+--            КОНСТРУКТОР (определён в конце)
+-- ====================================================
+function UIModule.new(config)
+    config = config or {}
+    local settings = loadSettings()
+    if config.Settings then
+        for k, v in pairs(config.Settings) do
+            settings[k] = v
+        end
+        saveSettings(settings)
+    end
+
+    local self = setmetatable({}, { __index = UIModule })
+    self.config = config
+    self.settings = settings
+    self.tabs = {}
+    self.tabButtons = {}
+    self.tabPanels = {}
+    self.elements = {}
+    self.currentTab = nil
+    self.visible = true
+    self.toggleConnection = nil
+    self.theme = settings.Theme
+    self.isMobile = UserInputService.TouchEnabled
+    self.themeData = Themes[self.theme] or Themes.Dark
+
+    self:createGUI()   -- теперь метод гарантированно определён
+
+    if config.Tabs then
+        for _, tabData in ipairs(config.Tabs) do
+            self:addTab(tabData.Name, tabData.Elements)
+        end
+    end
+    if not self.tabs["Settings"] then
+        self:addSettingsTab()
+    end
+    local firstTab = next(self.tabs)
+    if firstTab then
+        self:selectTab(firstTab)
+    end
+    self:setupToggleKey()
+    self:applyTheme(self.theme)
+    self:setVisible(true)
+
+    self.gui.AncestryChanged:Connect(function()
+        if not self.gui.Parent then
+            self:destroy()
+        end
+    end)
+
+    return self
 end
 
 return UIModule
