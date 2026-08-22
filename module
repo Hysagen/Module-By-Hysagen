@@ -14,16 +14,36 @@ local COLORS = {
     Green = Color3.fromRGB(70, 255, 70),
 }
 
+-- Режимы масштабирования
+local SCALES = {
+    {name = "3:4", width = 600, height = 400, tabsLeft = true},
+    {name = "1:1", width = 500, height = 500, tabsLeft = true},
+    {name = "1:2", width = 700, height = 350, tabsLeft = false},
+}
+
 local function createMainFrame(title)
     local screenGui = Instance.new("ScreenGui")
     screenGui.Name = "UIFramework"
     screenGui.ResetOnSpawn = false
     screenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
     
+    -- Загружаем сохранённый масштаб
+    local savedScale = game:GetService("DataStoreService"):GetDataStore("UIFramework_Settings"):GetAsync("Scale") or "3:4"
+    local currentScale = nil
+    for _, s in ipairs(SCALES) do
+        if s.name == savedScale then
+            currentScale = s
+            break
+        end
+    end
+    if not currentScale then
+        currentScale = SCALES[1]
+    end
+    
     local mainFrame = Instance.new("Frame")
     mainFrame.Name = "MainFrame"
-    mainFrame.Size = UDim2.new(0, 600, 0, 400)
-    mainFrame.Position = UDim2.new(0.5, -300, 0.5, -200)
+    mainFrame.Size = UDim2.new(0, currentScale.width, 0, currentScale.height)
+    mainFrame.Position = UDim2.new(0.5, -currentScale.width/2, 0.5, -currentScale.height/2)
     mainFrame.BackgroundColor3 = COLORS.Background
     mainFrame.BackgroundTransparency = 0
     mainFrame.BorderSizePixel = 0
@@ -86,91 +106,34 @@ local function createMainFrame(title)
     container.BackgroundTransparency = 1
     container.Parent = mainFrame
     
-    -- Левая панель
-    local leftPanel = Instance.new("Frame")
-    leftPanel.Name = "LeftPanel"
-    leftPanel.Size = UDim2.new(0, 180, 1, 0)
-    leftPanel.BackgroundColor3 = Color3.fromRGB(40, 40, 48)
-    leftPanel.BackgroundTransparency = 0
-    leftPanel.BorderSizePixel = 0
-    leftPanel.Parent = container
+    -- Переменные для левой панели
+    local leftPanel = nil
+    local leftScrolling = nil
+    local leftLayout = nil
+    local rightPanel = nil
+    local pagesScrolling = nil
+    local pagesContainer = nil
     
-    local leftCorner = Instance.new("UICorner")
-    leftCorner.CornerRadius = UDim.new(0, 8)
-    leftCorner.Parent = leftPanel
-    
-    local leftMask = Instance.new("Frame")
-    leftMask.Size = UDim2.new(0, 8, 1, 0)
-    leftMask.Position = UDim2.new(1, -8, 0, 0)
-    leftMask.BackgroundColor3 = leftPanel.BackgroundColor3
-    leftMask.BackgroundTransparency = 0
-    leftMask.BorderSizePixel = 0
-    leftMask.Parent = leftPanel
-    
-    -- Скроллинг для левой панели
-    local leftScrolling = Instance.new("ScrollingFrame")
-    leftScrolling.Size = UDim2.new(1, 0, 1, 0)
-    leftScrolling.BackgroundTransparency = 1
-    leftScrolling.BorderSizePixel = 0
-    leftScrolling.ScrollBarThickness = 4
-    leftScrolling.ScrollBarImageColor3 = COLORS.Accent
-    leftScrolling.CanvasSize = UDim2.new(0, 0, 0, 0)
-    leftScrolling.Parent = leftPanel
-    
-    local leftLayout = Instance.new("UIListLayout")
-    leftLayout.Padding = UDim.new(0, 4)
-    leftLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    leftLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    leftLayout.VerticalAlignment = Enum.VerticalAlignment.Top
-    leftLayout.Parent = leftScrolling
-    
-    -- Правая панель
-    local rightPanel = Instance.new("Frame")
-    rightPanel.Name = "RightPanel"
-    rightPanel.Size = UDim2.new(1, -180, 1, 0)
-    rightPanel.Position = UDim2.new(0, 180, 0, 0)
-    rightPanel.BackgroundColor3 = COLORS.Background
-    rightPanel.BackgroundTransparency = 0
-    rightPanel.BorderSizePixel = 0
-    rightPanel.Parent = container
-    
-    local rightCorner = Instance.new("UICorner")
-    rightCorner.CornerRadius = UDim.new(0, 8)
-    rightCorner.Parent = rightPanel
-    
-    local rightMask = Instance.new("Frame")
-    rightMask.Size = UDim2.new(0, 8, 1, 0)
-    rightMask.Position = UDim2.new(0, 0, 0, 0)
-    rightMask.BackgroundColor3 = rightPanel.BackgroundColor3
-    rightMask.BackgroundTransparency = 0
-    rightMask.BorderSizePixel = 0
-    rightMask.Parent = rightPanel
-    
-    -- ScrollingFrame для страниц
-    local pagesScrolling = Instance.new("ScrollingFrame")
-    pagesScrolling.Name = "PagesScrolling"
-    pagesScrolling.Size = UDim2.new(1, 0, 1, 0)
-    pagesScrolling.BackgroundTransparency = 1
-    pagesScrolling.BorderSizePixel = 0
-    pagesScrolling.ScrollBarThickness = 6
-    pagesScrolling.ScrollBarImageColor3 = COLORS.Accent
-    pagesScrolling.CanvasSize = UDim2.new(0, 0, 0, 0)
-    pagesScrolling.Parent = rightPanel
-    
-    local pagesContainer = Instance.new("Frame")
-    pagesContainer.Name = "PagesContainer"
-    pagesContainer.Size = UDim2.new(1, -16, 1, 0)
-    pagesContainer.Position = UDim2.new(0, 8, 0, 0)
-    pagesContainer.BackgroundTransparency = 1
-    pagesContainer.Parent = pagesScrolling
+    -- Переменные для верхней панели (режим 1:2)
+    local topTabsPanel = nil
+    local topTabsScrolling = nil
+    local topTabsLayout = nil
+    local bottomContent = nil
+    local bottomScrolling = nil
+    local bottomContainer = nil
     
     local pages = {}
     local activePage = nil
     
-    -- Функция обновления CanvasSize
+    -- Функция обновления CanvasSize для страниц
     local function updatePagesCanvas()
         if not pages then
-            pagesScrolling.CanvasSize = UDim2.new(0, 0, 0, 16)
+            if pagesScrolling then
+                pagesScrolling.CanvasSize = UDim2.new(0, 0, 0, 16)
+            end
+            if bottomScrolling then
+                bottomScrolling.CanvasSize = UDim2.new(0, 0, 0, 16)
+            end
             return
         end
         
@@ -180,8 +143,174 @@ local function createMainFrame(title)
                 totalHeight = totalHeight + data.Frame.Size.Y.Offset + 4
             end
         end
-        pagesScrolling.CanvasSize = UDim2.new(0, 0, 0, totalHeight)
+        
+        if currentScale.tabsLeft then
+            if pagesScrolling then
+                pagesScrolling.CanvasSize = UDim2.new(0, 0, 0, totalHeight)
+            end
+        else
+            if bottomScrolling then
+                bottomScrolling.CanvasSize = UDim2.new(0, 0, 0, totalHeight)
+            end
+        end
     end
+    
+    -- Функция создания интерфейса в зависимости от масштаба
+    local function buildInterface()
+        -- Очищаем контейнер
+        for _, child in ipairs(container:GetChildren()) do
+            child:Destroy()
+        end
+        
+        if currentScale.tabsLeft then
+            -- === РЕЖИМ 3:4 И 1:1 (кнопки слева) ===
+            
+            -- Левая панель
+            leftPanel = Instance.new("Frame")
+            leftPanel.Name = "LeftPanel"
+            leftPanel.Size = UDim2.new(0, 180, 1, 0)
+            leftPanel.BackgroundColor3 = Color3.fromRGB(40, 40, 48)
+            leftPanel.BackgroundTransparency = 0
+            leftPanel.BorderSizePixel = 0
+            leftPanel.Parent = container
+            
+            local leftCorner = Instance.new("UICorner")
+            leftCorner.CornerRadius = UDim.new(0, 8)
+            leftCorner.Parent = leftPanel
+            
+            local leftMask = Instance.new("Frame")
+            leftMask.Size = UDim2.new(0, 8, 1, 0)
+            leftMask.Position = UDim2.new(1, -8, 0, 0)
+            leftMask.BackgroundColor3 = leftPanel.BackgroundColor3
+            leftMask.BackgroundTransparency = 0
+            leftMask.BorderSizePixel = 0
+            leftMask.Parent = leftPanel
+            
+            leftScrolling = Instance.new("ScrollingFrame")
+            leftScrolling.Size = UDim2.new(1, 0, 1, 0)
+            leftScrolling.BackgroundTransparency = 1
+            leftScrolling.BorderSizePixel = 0
+            leftScrolling.ScrollBarThickness = 4
+            leftScrolling.ScrollBarImageColor3 = COLORS.Accent
+            leftScrolling.CanvasSize = UDim2.new(0, 0, 0, 0)
+            leftScrolling.Parent = leftPanel
+            
+            leftLayout = Instance.new("UIListLayout")
+            leftLayout.Padding = UDim.new(0, 4)
+            leftLayout.SortOrder = Enum.SortOrder.LayoutOrder
+            leftLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+            leftLayout.VerticalAlignment = Enum.VerticalAlignment.Top
+            leftLayout.Parent = leftScrolling
+            
+            -- Правая панель
+            rightPanel = Instance.new("Frame")
+            rightPanel.Name = "RightPanel"
+            rightPanel.Size = UDim2.new(1, -180, 1, 0)
+            rightPanel.Position = UDim2.new(0, 180, 0, 0)
+            rightPanel.BackgroundColor3 = COLORS.Background
+            rightPanel.BackgroundTransparency = 0
+            rightPanel.BorderSizePixel = 0
+            rightPanel.Parent = container
+            
+            local rightCorner = Instance.new("UICorner")
+            rightCorner.CornerRadius = UDim.new(0, 8)
+            rightCorner.Parent = rightPanel
+            
+            local rightMask = Instance.new("Frame")
+            rightMask.Size = UDim2.new(0, 8, 1, 0)
+            rightMask.Position = UDim2.new(0, 0, 0, 0)
+            rightMask.BackgroundColor3 = rightPanel.BackgroundColor3
+            rightMask.BackgroundTransparency = 0
+            rightMask.BorderSizePixel = 0
+            rightMask.Parent = rightPanel
+            
+            pagesScrolling = Instance.new("ScrollingFrame")
+            pagesScrolling.Name = "PagesScrolling"
+            pagesScrolling.Size = UDim2.new(1, 0, 1, 0)
+            pagesScrolling.BackgroundTransparency = 1
+            pagesScrolling.BorderSizePixel = 0
+            pagesScrolling.ScrollBarThickness = 6
+            pagesScrolling.ScrollBarImageColor3 = COLORS.Accent
+            pagesScrolling.CanvasSize = UDim2.new(0, 0, 0, 0)
+            pagesScrolling.Parent = rightPanel
+            
+            pagesContainer = Instance.new("Frame")
+            pagesContainer.Name = "PagesContainer"
+            pagesContainer.Size = UDim2.new(1, -16, 1, 0)
+            pagesContainer.Position = UDim2.new(0, 8, 0, 0)
+            pagesContainer.BackgroundTransparency = 1
+            pagesContainer.Parent = pagesScrolling
+            
+        else
+            -- === РЕЖИМ 1:2 (кнопки сверху) ===
+            
+            -- Верхняя панель с вкладками
+            topTabsPanel = Instance.new("Frame")
+            topTabsPanel.Name = "TopTabsPanel"
+            topTabsPanel.Size = UDim2.new(1, 0, 0, 50)
+            topTabsPanel.BackgroundColor3 = Color3.fromRGB(40, 40, 48)
+            topTabsPanel.BackgroundTransparency = 0
+            topTabsPanel.BorderSizePixel = 0
+            topTabsPanel.Parent = container
+            
+            local topTabsCorner = Instance.new("UICorner")
+            topTabsCorner.CornerRadius = UDim.new(0, 8)
+            topTabsCorner.Parent = topTabsPanel
+            
+            -- Горизонтальный скроллинг для вкладок
+            topTabsScrolling = Instance.new("ScrollingFrame")
+            topTabsScrolling.Size = UDim2.new(1, 0, 1, 0)
+            topTabsScrolling.BackgroundTransparency = 1
+            topTabsScrolling.BorderSizePixel = 0
+            topTabsScrolling.ScrollBarThickness = 4
+            topTabsScrolling.ScrollBarImageColor3 = COLORS.Accent
+            topTabsScrolling.CanvasSize = UDim2.new(0, 0, 0, 0)
+            topTabsScrolling.Parent = topTabsPanel
+            topTabsScrolling.ScrollingDirection = Enum.ScrollingDirection.X
+            
+            topTabsLayout = Instance.new("UIListLayout")
+            topTabsLayout.Padding = UDim.new(0, 4)
+            topTabsLayout.SortOrder = Enum.SortOrder.LayoutOrder
+            topTabsLayout.FillDirection = Enum.FillDirection.Horizontal
+            topTabsLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+            topTabsLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+            topTabsLayout.Parent = topTabsScrolling
+            
+            -- Контент снизу
+            bottomContent = Instance.new("Frame")
+            bottomContent.Name = "BottomContent"
+            bottomContent.Size = UDim2.new(1, 0, 1, -50)
+            bottomContent.Position = UDim2.new(0, 0, 0, 50)
+            bottomContent.BackgroundColor3 = COLORS.Background
+            bottomContent.BackgroundTransparency = 0
+            bottomContent.BorderSizePixel = 0
+            bottomContent.Parent = container
+            
+            local bottomCorner = Instance.new("UICorner")
+            bottomCorner.CornerRadius = UDim.new(0, 8)
+            bottomCorner.Parent = bottomContent
+            
+            bottomScrolling = Instance.new("ScrollingFrame")
+            bottomScrolling.Name = "BottomScrolling"
+            bottomScrolling.Size = UDim2.new(1, 0, 1, 0)
+            bottomScrolling.BackgroundTransparency = 1
+            bottomScrolling.BorderSizePixel = 0
+            bottomScrolling.ScrollBarThickness = 6
+            bottomScrolling.ScrollBarImageColor3 = COLORS.Accent
+            bottomScrolling.CanvasSize = UDim2.new(0, 0, 0, 0)
+            bottomScrolling.Parent = bottomContent
+            
+            bottomContainer = Instance.new("Frame")
+            bottomContainer.Name = "BottomContainer"
+            bottomContainer.Size = UDim2.new(1, -16, 1, 0)
+            bottomContainer.Position = UDim2.new(0, 8, 0, 0)
+            bottomContainer.BackgroundTransparency = 1
+            bottomContainer.Parent = bottomScrolling
+        end
+    end
+    
+    -- Строим интерфейс
+    buildInterface()
     
     -- === ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ ===
     local function createElementContainer(parent)
@@ -335,7 +464,7 @@ local function createMainFrame(title)
         }
     end
     
-    -- === 3) ПОЛЗУНОК (целочисленный, с ручкой) ===
+    -- === 3) ПОЛЗУНОК ===
     function UIFramework:CreateSlider(page, label, min, max, default)
         local container = createElementContainer(page)
         container.Size = UDim2.new(1, 0, 0, 54)
@@ -399,7 +528,7 @@ local function createMainFrame(title)
         fillCorner.CornerRadius = UDim.new(0, 2)
         fillCorner.Parent = fill
         
-        -- Ручка (круглая точка)
+        -- Ручка
         local handle = Instance.new("Frame")
         handle.Size = UDim2.new(0, 16, 0, 16)
         handle.Position = UDim2.new(0.5, -8, 0.5, -8)
@@ -412,7 +541,6 @@ local function createMainFrame(title)
         handleCorner.CornerRadius = UDim.new(1, 0)
         handleCorner.Parent = handle
         
-        -- Обводка ручки (белая)
         local handleBorder = Instance.new("Frame")
         handleBorder.Size = UDim2.new(1, 0, 1, 0)
         handleBorder.BackgroundColor3 = COLORS.Text
@@ -472,28 +600,23 @@ local function createMainFrame(title)
             end
         end
         
-        -- События на полосу
         slider.InputBegan:Connect(startDrag)
         slider.InputEnded:Connect(endDrag)
-        
-        -- События на ручку
         handle.InputBegan:Connect(startDrag)
         handle.InputEnded:Connect(endDrag)
         handleBorder.InputBegan:Connect(startDrag)
         handleBorder.InputEnded:Connect(endDrag)
         
-        -- Глобальные события
         local inputService = game:GetService("UserInputService")
-        local moveConnection = inputService.InputChanged:Connect(moveDrag)
-        local endConnection = inputService.InputEnded:Connect(endDrag)
+        inputService.InputChanged:Connect(moveDrag)
+        inputService.InputEnded:Connect(endDrag)
         
         task.wait(0.05)
         updatePagesCanvas()
         
         return {
             SetValue = updateSlider,
-            GetValue = function() return value end,
-            _connections = {moveConnection, endConnection}
+            GetValue = function() return value end
         }
     end
     
@@ -536,7 +659,6 @@ local function createMainFrame(title)
         arrow.Parent = mainBtn
         arrow.ZIndex = 2
         
-        -- Фрейм для списка
         local listFrame = Instance.new("Frame")
         listFrame.Size = UDim2.new(1, -16, 0, 0)
         listFrame.Position = UDim2.new(0, 8, 0, 40)
@@ -565,7 +687,6 @@ local function createMainFrame(title)
         listShadowCorner.CornerRadius = UDim.new(0, 4)
         listShadowCorner.Parent = listShadow
         
-        -- ScrollingFrame внутри списка
         local listScrolling = Instance.new("ScrollingFrame")
         listScrolling.Size = UDim2.new(1, 0, 1, 0)
         listScrolling.BackgroundTransparency = 1
@@ -762,7 +883,12 @@ local function createMainFrame(title)
         pageFrame.Size = UDim2.new(1, 0, 0, 0)
         pageFrame.BackgroundTransparency = 1
         pageFrame.Visible = false
-        pageFrame.Parent = pagesContainer
+        
+        if currentScale.tabsLeft then
+            pageFrame.Parent = pagesContainer
+        else
+            pageFrame.Parent = bottomContainer
+        end
         
         local pageLayout = Instance.new("UIListLayout")
         pageLayout.Padding = UDim.new(0, 4)
@@ -785,6 +911,7 @@ local function createMainFrame(title)
             updatePageSize()
         end)
         
+        -- Кнопка вкладки
         local tabBtn = Instance.new("TextButton")
         tabBtn.Name = name .. "Tab"
         tabBtn.Size = UDim2.new(0, 140, 0, 36)
@@ -798,13 +925,18 @@ local function createMainFrame(title)
         tabBtn.TextYAlignment = Enum.TextYAlignment.Center
         tabBtn.TextTruncate = Enum.TextTruncate.AtEnd
         tabBtn.Font = Enum.Font.GothamSemibold
-        tabBtn.Parent = leftScrolling
+        tabBtn.Parent = currentScale.tabsLeft and leftScrolling or topTabsScrolling
         
         local tabCorner = Instance.new("UICorner")
         tabCorner.CornerRadius = UDim.new(0, 4)
         tabCorner.Parent = tabBtn
         
-        leftScrolling.CanvasSize = UDim2.new(0, 0, 0, leftScrolling.CanvasSize.Y.Offset + 40)
+        -- Обновляем CanvasSize
+        if currentScale.tabsLeft then
+            leftScrolling.CanvasSize = UDim2.new(0, 0, 0, leftScrolling.CanvasSize.Y.Offset + 40)
+        else
+            topTabsScrolling.CanvasSize = UDim2.new(0, 0, 0, topTabsScrolling.CanvasSize.Y.Offset + 40)
+        end
         
         tabBtn.MouseButton1Click:Connect(function()
             UIFramework:SwitchPage(name)
@@ -890,9 +1022,7 @@ local function createMainFrame(title)
     return {
         MainFrame = mainFrame,
         TopBar = topBar,
-        LeftPanel = leftScrolling,
-        RightPanel = rightPanel,
-        PagesContainer = pagesContainer,
+        Container = container,
         CreatePage = UIFramework.CreatePage,
         SwitchPage = UIFramework.SwitchPage,
         Pages = pages,
@@ -901,7 +1031,40 @@ local function createMainFrame(title)
         CreateToggle = UIFramework.CreateToggle,
         CreateSlider = UIFramework.CreateSlider,
         CreateDropdown = UIFramework.CreateDropdown,
-        UpdatePagesCanvas = updatePagesCanvas
+        UpdatePagesCanvas = updatePagesCanvas,
+        -- Функция для смены масштаба
+        SetScale = function(scaleName)
+            for _, s in ipairs(SCALES) do
+                if s.name == scaleName then
+                    currentScale = s
+                    mainFrame.Size = UDim2.new(0, s.width, 0, s.height)
+                    mainFrame.Position = UDim2.new(0.5, -s.width/2, 0.5, -s.height/2)
+                    buildInterface()
+                    -- Пересоздаём страницы
+                    for name, data in pairs(pages) do
+                        data.Frame.Parent = currentScale.tabsLeft and pagesContainer or bottomContainer
+                        data.Button.Parent = currentScale.tabsLeft and leftScrolling or topTabsScrolling
+                        if currentScale.tabsLeft then
+                            leftScrolling.CanvasSize = UDim2.new(0, 0, 0, leftScrolling.CanvasSize.Y.Offset + 40)
+                        else
+                            topTabsScrolling.CanvasSize = UDim2.new(0, 0, 0, topTabsScrolling.CanvasSize.Y.Offset + 40)
+                        end
+                    end
+                    updatePagesCanvas()
+                    -- Сохраняем
+                    local ds = game:GetService("DataStoreService"):GetDataStore("UIFramework_Settings")
+                    ds:SetAsync("Scale", scaleName)
+                    return true
+                end
+            end
+            return false
+        end,
+        GetScale = function()
+            return currentScale.name
+        end,
+        GetScales = function()
+            return SCALES
+        end
     }
 end
 
