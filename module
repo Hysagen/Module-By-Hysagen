@@ -1,1091 +1,935 @@
 --[[
     UI Module for Roblox Scripts
-    Load with: local UI = loadstring(game:HttpGet("..."))()
+    Version 1.0
     Usage:
-        local ui = UI.New({
-            title = "My UI",
-            aspectRatio = 3/4,  -- width/height
-            bindKey = "RightShift",
-            theme = "Dark",    -- or table of colors
-            tabs = {"Main", "Settings"}  -- optional
+        local UI = loadstring(game:HttpGet("..."))()
+        local myUI = UI.new({
+            Name = "My Script GUI",
+            Tabs = {
+                {
+                    Name = "Main",
+                    Elements = {
+                        { Type = "Toggle", Name = "Auto Farm", Bind = "F", Default = false, Callback = function(v) print("Auto Farm:", v) end },
+                        { Type = "Button", Name = "Click Me", Callback = function() print("Clicked") end },
+                        { Type = "Slider", Name = "Speed", Min = 0, Max = 100, Default = 50, Callback = function(v) print("Speed:", v) end },
+                        { Type = "Dropdown", Name = "Mode", Options = {"Easy", "Normal", "Hard"}, Default = "Normal", Multi = false, Callback = function(v) print("Mode:", v) end },
+                    }
+                },
+                -- more tabs...
+            },
+            Settings = {
+                Theme = "Dark",          -- optional
+                ToggleKey = "RightControl", -- optional
+                SizeRatio = "3:4"        -- optional
+            }
         })
-        local main = ui:AddTab("Main")
-        main:AddToggle("Auto Farm", "F", false)
-        main:AddSlider("Speed", 1, 100, 50)
-        main:AddDropdown("Mode", {"Easy","Hard"}, false, "Easy")
-        main:AddButton("Click Me", function() print("Clicked") end)
-        -- Settings tab is auto-added with theme & bind key changer
-        -- To save theme: local theme = ui:GetTheme() then save it, and pass on next init
---]]
+]]
 
-return function()
-    local Players = game:GetService("Players")
-    local UserInputService = game:GetService("UserInputService")
-    local TweenService = game:GetService("TweenService")
-    local RunService = game:GetService("RunService")
-    local GuiService = game:GetService("GuiService")
-    local HttpService = game:GetService("HttpService") -- for serialization
+local UIModule = {}
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
 
-    local UIManager = {}
-    UIManager.__index = UIManager
+-- ============ Themes ============
+local Themes = {
+    Dark = {
+        Background = Color3.fromRGB(30, 30, 30),
+        Panel = Color3.fromRGB(35, 35, 35),
+        Tab = Color3.fromRGB(50, 50, 50),
+        TabSelected = Color3.fromRGB(70, 70, 70),
+        TabHover = Color3.fromRGB(60, 60, 60),
+        Text = Color3.fromRGB(255, 255, 255),
+        TextDim = Color3.fromRGB(200, 200, 200),
+        Button = Color3.fromRGB(60, 60, 60),
+        ButtonHover = Color3.fromRGB(80, 80, 80),
+        ToggleOn = Color3.fromRGB(0, 200, 0),
+        ToggleOff = Color3.fromRGB(200, 0, 0),
+        Accent = Color3.fromRGB(0, 120, 255),
+        SliderTrack = Color3.fromRGB(70, 70, 70),
+        SliderFill = Color3.fromRGB(0, 120, 255),
+        DropdownBg = Color3.fromRGB(50, 50, 50),
+        DropdownItem = Color3.fromRGB(60, 60, 60),
+        DropdownItemHover = Color3.fromRGB(80, 80, 80),
+    },
+    Light = {
+        Background = Color3.fromRGB(240, 240, 240),
+        Panel = Color3.fromRGB(230, 230, 230),
+        Tab = Color3.fromRGB(220, 220, 220),
+        TabSelected = Color3.fromRGB(200, 200, 200),
+        TabHover = Color3.fromRGB(210, 210, 210),
+        Text = Color3.fromRGB(30, 30, 30),
+        TextDim = Color3.fromRGB(80, 80, 80),
+        Button = Color3.fromRGB(200, 200, 200),
+        ButtonHover = Color3.fromRGB(180, 180, 180),
+        ToggleOn = Color3.fromRGB(0, 180, 0),
+        ToggleOff = Color3.fromRGB(180, 0, 0),
+        Accent = Color3.fromRGB(0, 100, 200),
+        SliderTrack = Color3.fromRGB(200, 200, 200),
+        SliderFill = Color3.fromRGB(0, 100, 200),
+        DropdownBg = Color3.fromRGB(220, 220, 220),
+        DropdownItem = Color3.fromRGB(200, 200, 200),
+        DropdownItemHover = Color3.fromRGB(180, 180, 180),
+    },
+    Blue = {
+        Background = Color3.fromRGB(20, 30, 50),
+        Panel = Color3.fromRGB(25, 40, 65),
+        Tab = Color3.fromRGB(30, 50, 80),
+        TabSelected = Color3.fromRGB(40, 70, 110),
+        TabHover = Color3.fromRGB(35, 60, 95),
+        Text = Color3.fromRGB(220, 230, 255),
+        TextDim = Color3.fromRGB(170, 190, 220),
+        Button = Color3.fromRGB(30, 60, 100),
+        ButtonHover = Color3.fromRGB(50, 80, 130),
+        ToggleOn = Color3.fromRGB(0, 200, 100),
+        ToggleOff = Color3.fromRGB(200, 80, 80),
+        Accent = Color3.fromRGB(80, 180, 255),
+        SliderTrack = Color3.fromRGB(40, 60, 90),
+        SliderFill = Color3.fromRGB(80, 180, 255),
+        DropdownBg = Color3.fromRGB(30, 50, 80),
+        DropdownItem = Color3.fromRGB(35, 60, 100),
+        DropdownItemHover = Color3.fromRGB(50, 80, 130),
+    },
+}
 
-    -- Predefined themes
-    local Themes = {
-        Dark = {
-            Background = Color3.fromRGB(30, 30, 36),
-            BackgroundSecondary = Color3.fromRGB(45, 45, 52),
-            Foreground = Color3.fromRGB(60, 60, 70),
-            Text = Color3.fromRGB(220, 220, 230),
-            TextDim = Color3.fromRGB(160, 160, 170),
-            Accent = Color3.fromRGB(0, 120, 255),
-            AccentHover = Color3.fromRGB(0, 100, 220),
-            AccentPressed = Color3.fromRGB(0, 80, 190),
-            ToggleOn = Color3.fromRGB(0, 200, 100),
-            ToggleOff = Color3.fromRGB(200, 60, 60),
-            Border = Color3.fromRGB(70, 70, 80),
-            Dropdown = Color3.fromRGB(40, 40, 48),
-            Shadow = Color3.fromRGB(0, 0, 0)
-        },
-        Light = {
-            Background = Color3.fromRGB(240, 240, 245),
-            BackgroundSecondary = Color3.fromRGB(220, 220, 230),
-            Foreground = Color3.fromRGB(200, 200, 210),
-            Text = Color3.fromRGB(30, 30, 40),
-            TextDim = Color3.fromRGB(80, 80, 90),
-            Accent = Color3.fromRGB(0, 120, 255),
-            AccentHover = Color3.fromRGB(0, 100, 220),
-            AccentPressed = Color3.fromRGB(0, 80, 190),
-            ToggleOn = Color3.fromRGB(0, 200, 100),
-            ToggleOff = Color3.fromRGB(200, 60, 60),
-            Border = Color3.fromRGB(180, 180, 190),
-            Dropdown = Color3.fromRGB(210, 210, 220),
-            Shadow = Color3.fromRGB(0, 0, 0)
-        },
-        Blue = {
-            Background = Color3.fromRGB(20, 30, 50),
-            BackgroundSecondary = Color3.fromRGB(30, 45, 70),
-            Foreground = Color3.fromRGB(40, 60, 90),
-            Text = Color3.fromRGB(220, 230, 250),
-            TextDim = Color3.fromRGB(160, 180, 210),
-            Accent = Color3.fromRGB(60, 140, 255),
-            AccentHover = Color3.fromRGB(40, 120, 235),
-            AccentPressed = Color3.fromRGB(20, 100, 215),
-            ToggleOn = Color3.fromRGB(0, 220, 120),
-            ToggleOff = Color3.fromRGB(220, 80, 80),
-            Border = Color3.fromRGB(50, 70, 100),
-            Dropdown = Color3.fromRGB(30, 50, 80),
-            Shadow = Color3.fromRGB(0, 0, 0)
-        },
-        Purple = {
-            Background = Color3.fromRGB(30, 20, 40),
-            BackgroundSecondary = Color3.fromRGB(50, 35, 65),
-            Foreground = Color3.fromRGB(70, 50, 90),
-            Text = Color3.fromRGB(230, 210, 250),
-            TextDim = Color3.fromRGB(180, 160, 210),
-            Accent = Color3.fromRGB(170, 100, 255),
-            AccentHover = Color3.fromRGB(150, 80, 235),
-            AccentPressed = Color3.fromRGB(130, 60, 215),
-            ToggleOn = Color3.fromRGB(0, 220, 120),
-            ToggleOff = Color3.fromRGB(220, 80, 80),
-            Border = Color3.fromRGB(70, 50, 90),
-            Dropdown = Color3.fromRGB(50, 35, 65),
-            Shadow = Color3.fromRGB(0, 0, 0)
-        }
+-- ============ Settings Storage ============
+local defaultSettings = {
+    Theme = "Dark",
+    ToggleKey = "RightControl",
+    SizeRatio = "3:4",
+}
+
+local function loadSettings()
+    if _G.__UI_Settings then
+        return _G.__UI_Settings
+    else
+        _G.__UI_Settings = table.clone(defaultSettings)
+        return _G.__UI_Settings
+    end
+end
+
+local function saveSettings(settings)
+    _G.__UI_Settings = settings
+end
+
+-- ============ Utility ============
+local function parseRatio(str)
+    local parts = {}
+    for part in str:gmatch("[^:]+") do
+        table.insert(parts, tonumber(part))
+    end
+    if #parts == 2 then
+        return parts[1] / parts[2]
+    end
+    return 3/4
+end
+
+local function getKeyEnum(keyName)
+    if type(keyName) == "string" then
+        local upper = keyName:upper()
+        return Enum.KeyCode[upper] or Enum.KeyCode[upper:gsub(" ", "")]
+    end
+    return nil
+end
+
+-- ============ UIModule ============
+function UIModule.new(config)
+    config = config or {}
+    local settings = loadSettings()
+    if config.Settings then
+        for k, v in pairs(config.Settings) do
+            settings[k] = v
+        end
+        saveSettings(settings)
+    end
+
+    local self = setmetatable({}, UIModule)
+    self.config = config
+    self.settings = settings
+    self.tabs = {}          -- name -> {elements = {}}
+    self.tabButtons = {}    -- name -> TextButton
+    self.tabPanels = {}     -- name -> ScrollingFrame
+    self.elements = {}      -- name -> list of element objects
+    self.currentTab = nil
+    self.visible = true
+    self.toggleConnection = nil
+    self.theme = settings.Theme
+    self.isMobile = UserInputService.TouchEnabled
+
+    -- Create GUI
+    self:createGUI()
+
+    -- Add tabs from config
+    if config.Tabs then
+        for _, tabData in ipairs(config.Tabs) do
+            self:addTab(tabData.Name, tabData.Elements)
+        end
+    end
+
+    -- Add Settings tab if not exists
+    if not self.tabs["Settings"] then
+        self:addSettingsTab()
+    end
+
+    -- Select first tab
+    local firstTab = next(self.tabs)
+    if firstTab then
+        self:selectTab(firstTab)
+    end
+
+    -- Setup toggle key
+    self:setupToggleKey()
+
+    -- Apply theme
+    self:applyTheme(self.theme)
+
+    -- Make sure it's visible
+    self:setVisible(true)
+
+    -- Cleanup on player leaving
+    self.gui.AncestryChanged:Connect(function()
+        if not self.gui.Parent then
+            self:destroy()
+        end
+    end)
+
+    return self
+end
+
+function UIModule:createGUI()
+    local gui = Instance.new("ScreenGui")
+    gui.Name = self.config.Name or "UI"
+    gui.ResetOnSpawn = false
+    gui.Parent = playerGui
+
+    local mainFrame = Instance.new("Frame")
+    mainFrame.Name = "MainFrame"
+    mainFrame.Parent = gui
+    mainFrame.BackgroundColor3 = Color3.fromRGB(30,30,30)
+    mainFrame.BackgroundTransparency = 0
+    mainFrame.BorderSizePixel = 0
+    mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+    mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+    mainFrame.Size = UDim2.new(0.5, 0, 0, 0)
+    mainFrame.ClipsDescendants = true
+
+    local aspect = Instance.new("UIAspectRatioConstraint")
+    aspect.Parent = mainFrame
+    aspect.AspectRatio = parseRatio(self.settings.SizeRatio)
+
+    -- Title Bar
+    local titleBar = Instance.new("Frame")
+    titleBar.Name = "TitleBar"
+    titleBar.Parent = mainFrame
+    titleBar.BackgroundColor3 = Color3.fromRGB(40,40,40)
+    titleBar.BackgroundTransparency = 0
+    titleBar.BorderSizePixel = 0
+    titleBar.Size = UDim2.new(1, 0, 0, 40)
+
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Parent = titleBar
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.Text = self.config.Name or "GUI"
+    titleLabel.TextColor3 = Color3.fromRGB(255,255,255)
+    titleLabel.TextSize = 18
+    titleLabel.Font = Enum.Font.GothamBold
+    titleLabel.Position = UDim2.new(0.05, 0, 0, 0)
+    titleLabel.Size = UDim2.new(0.8, 0, 1, 0)
+    titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+    local closeButton = Instance.new("TextButton")
+    closeButton.Parent = titleBar
+    closeButton.BackgroundTransparency = 1
+    closeButton.Text = "✕"
+    closeButton.TextColor3 = Color3.fromRGB(255,255,255)
+    closeButton.TextSize = 18
+    closeButton.Font = Enum.Font.GothamBold
+    closeButton.Position = UDim2.new(0.95, -30, 0, 0)
+    closeButton.Size = UDim2.new(0, 30, 1, 0)
+    closeButton.MouseButton1Click:Connect(function()
+        self:toggleVisibility()
+    end)
+
+    -- Tabs Panel (right side)
+    local tabsPanel = Instance.new("ScrollingFrame")
+    tabsPanel.Name = "TabsPanel"
+    tabsPanel.Parent = mainFrame
+    tabsPanel.BackgroundColor3 = Color3.fromRGB(40,40,40)
+    tabsPanel.BackgroundTransparency = 0
+    tabsPanel.BorderSizePixel = 0
+    tabsPanel.Size = UDim2.new(0, 160, 1, -40)
+    tabsPanel.Position = UDim2.new(1, -160, 0, 40)
+    tabsPanel.CanvasSize = UDim2.new(0, 0, 0, 0)
+    tabsPanel.ScrollBarThickness = 6
+    tabsPanel.AutomaticCanvasSize = Enum.AutomaticSize.Y
+
+    -- Content Panel
+    local contentPanel = Instance.new("Frame")
+    contentPanel.Name = "ContentPanel"
+    contentPanel.Parent = mainFrame
+    contentPanel.BackgroundColor3 = Color3.fromRGB(35,35,35)
+    contentPanel.BackgroundTransparency = 0
+    contentPanel.BorderSizePixel = 0
+    contentPanel.Size = UDim2.new(1, -160, 1, -40)
+    contentPanel.Position = UDim2.new(0, 0, 0, 40)
+
+    self.gui = gui
+    self.mainFrame = mainFrame
+    self.titleBar = titleBar
+    self.tabsPanel = tabsPanel
+    self.contentPanel = contentPanel
+    self.aspectConstraint = aspect
+    self.titleLabel = titleLabel
+    self.closeButton = closeButton
+end
+
+-- ============ Tab Management ============
+function UIModule:addTab(name, elements)
+    if self.tabs[name] then return end
+    self.tabs[name] = { elements = {} }
+    self.elements[name] = {}
+
+    -- Tab button
+    local btn = Instance.new("TextButton")
+    btn.Name = "Tab_"..name
+    btn.Parent = self.tabsPanel
+    btn.BackgroundColor3 = Color3.fromRGB(50,50,50)
+    btn.BackgroundTransparency = 0
+    btn.BorderSizePixel = 0
+    btn.Text = name
+    btn.TextColor3 = Color3.fromRGB(255,255,255)
+    btn.TextSize = 16
+    btn.Font = Enum.Font.Gotham
+    btn.Size = UDim2.new(1, 0, 0, 40)
+    btn.Position = UDim2.new(0, 0, 0, (#self.tabButtons)*40)
+    btn.AutoButtonColor = false
+    btn.MouseButton1Click:Connect(function()
+        self:selectTab(name)
+    end)
+
+    self.tabButtons[name] = btn
+
+    -- Panel (ScrollingFrame) for content
+    local panel = Instance.new("ScrollingFrame")
+    panel.Name = "Panel_"..name
+    panel.Parent = self.contentPanel
+    panel.BackgroundTransparency = 1
+    panel.BorderSizePixel = 0
+    panel.Size = UDim2.new(1, 0, 1, 0)
+    panel.Position = UDim2.new(0, 0, 0, 0)
+    panel.CanvasSize = UDim2.new(0, 0, 0, 0)
+    panel.ScrollBarThickness = 6
+    panel.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    panel.Visible = false
+
+    self.tabPanels[name] = panel
+
+    -- Add elements
+    if elements then
+        for _, elemData in ipairs(elements) do
+            self:addElement(name, elemData)
+        end
+    end
+end
+
+function UIModule:selectTab(name)
+    if self.currentTab == name then return end
+    -- Hide previous
+    if self.currentTab and self.tabPanels[self.currentTab] then
+        self.tabPanels[self.currentTab].Visible = false
+        self.tabButtons[self.currentTab].BackgroundColor3 = self.themeData.Tab
+    end
+    -- Show selected
+    self.currentTab = name
+    if name and self.tabPanels[name] then
+        self.tabPanels[name].Visible = true
+        self.tabButtons[name].BackgroundColor3 = self.themeData.TabSelected
+    end
+end
+
+-- ============ Elements ============
+function UIModule:addElement(tabName, elemData)
+    local panel = self.tabPanels[tabName]
+    if not panel then return end
+
+    local element = nil
+    if elemData.Type == "Toggle" then
+        element = self:createToggle(panel, elemData)
+    elseif elemData.Type == "Button" then
+        element = self:createButton(panel, elemData)
+    elseif elemData.Type == "Slider" then
+        element = self:createSlider(panel, elemData)
+    elseif elemData.Type == "Dropdown" then
+        element = self:createDropdown(panel, elemData)
+    end
+
+    if element then
+        table.insert(self.elements[tabName], element)
+        -- apply current theme
+        self:applyThemeToElement(element)
+    end
+end
+
+-- ============ Toggle ============
+function UIModule:createToggle(parent, data)
+    local frame = Instance.new("Frame")
+    frame.Parent = parent
+    frame.BackgroundTransparency = 1
+    frame.Size = UDim2.new(1, 0, 0, 40)
+    frame.AutomaticSize = Enum.AutomaticSize.Y
+
+    local label = Instance.new("TextLabel")
+    label.Parent = frame
+    label.BackgroundTransparency = 1
+    label.Text = data.Name
+    label.TextColor3 = Color3.fromRGB(255,255,255)
+    label.TextSize = 16
+    label.Font = Enum.Font.Gotham
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Size = UDim2.new(0.6, 0, 1, 0)
+    label.Position = UDim2.new(0.05, 0, 0, 0)
+
+    local toggleBtn = Instance.new("TextButton")
+    toggleBtn.Parent = frame
+    toggleBtn.BackgroundColor3 = Color3.fromRGB(80,80,80)
+    toggleBtn.BorderSizePixel = 0
+    toggleBtn.Size = UDim2.new(0, 70, 0, 30)
+    toggleBtn.Position = UDim2.new(0.75, 0, 0.5, -15)
+    toggleBtn.Text = "Off"
+    toggleBtn.TextColor3 = Color3.fromRGB(255,255,255)
+    toggleBtn.Font = Enum.Font.Gotham
+    toggleBtn.TextSize = 14
+
+    local state = data.Default or false
+    toggleBtn.Text = state and "On" or "Off"
+    toggleBtn.BackgroundColor3 = state and Color3.fromRGB(0,200,0) or Color3.fromRGB(200,0,0)
+
+    toggleBtn.MouseButton1Click:Connect(function()
+        state = not state
+        toggleBtn.Text = state and "On" or "Off"
+        toggleBtn.BackgroundColor3 = state and self.themeData.ToggleOn or self.themeData.ToggleOff
+        if data.Callback then data.Callback(state) end
+    end)
+
+    -- Bind key
+    local bindKey = nil
+    if data.Bind then
+        local key = getKeyEnum(data.Bind)
+        if key then
+            bindKey = key
+            local conn
+            conn = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+                if gameProcessed then return end
+                if input.KeyCode == bindKey then
+                    toggleBtn.MouseButton1Click:Fire()
+                end
+            end)
+            frame._bindConnection = conn
+        end
+    end
+
+    local element = {
+        type = "Toggle",
+        frame = frame,
+        label = label,
+        toggleBtn = toggleBtn,
+        state = state,
+        data = data,
+        bindKey = bindKey,
+        applyTheme = function(self, themeData)
+            label.TextColor3 = themeData.Text
+            toggleBtn.TextColor3 = themeData.Text
+            toggleBtn.BackgroundColor3 = state and themeData.ToggleOn or themeData.ToggleOff
+        end
+    }
+    return element
+end
+
+-- ============ Button ============
+function UIModule:createButton(parent, data)
+    local frame = Instance.new("Frame")
+    frame.Parent = parent
+    frame.BackgroundTransparency = 1
+    frame.Size = UDim2.new(1, 0, 0, 40)
+    frame.AutomaticSize = Enum.AutomaticSize.Y
+
+    local btn = Instance.new("TextButton")
+    btn.Parent = frame
+    btn.BackgroundColor3 = Color3.fromRGB(60,60,60)
+    btn.BorderSizePixel = 0
+    btn.Size = UDim2.new(0.9, 0, 0, 30)
+    btn.Position = UDim2.new(0.05, 0, 0.5, -15)
+    btn.Text = data.Name
+    btn.TextColor3 = Color3.fromRGB(255,255,255)
+    btn.Font = Enum.Font.Gotham
+    btn.TextSize = 16
+    btn.AutoButtonColor = false
+
+    btn.MouseButton1Click:Connect(function()
+        if data.Callback then data.Callback() end
+    end)
+
+    local element = {
+        type = "Button",
+        frame = frame,
+        button = btn,
+        data = data,
+        applyTheme = function(self, themeData)
+            btn.BackgroundColor3 = themeData.Button
+            btn.TextColor3 = themeData.Text
+        end,
+        onHover = function(hover)
+            btn.BackgroundColor3 = hover and self.themeData.ButtonHover or self.themeData.Button
+        end
+    }
+    btn.MouseEnter:Connect(function() element:onHover(true) end)
+    btn.MouseLeave:Connect(function() element:onHover(false) end)
+    return element
+end
+
+-- ============ Slider ============
+function UIModule:createSlider(parent, data)
+    local frame = Instance.new("Frame")
+    frame.Parent = parent
+    frame.BackgroundTransparency = 1
+    frame.Size = UDim2.new(1, 0, 0, 50)
+    frame.AutomaticSize = Enum.AutomaticSize.Y
+
+    local label = Instance.new("TextLabel")
+    label.Parent = frame
+    label.BackgroundTransparency = 1
+    label.Text = data.Name .. ": " .. tostring(data.Default or data.Min or 0)
+    label.TextColor3 = Color3.fromRGB(255,255,255)
+    label.TextSize = 16
+    label.Font = Enum.Font.Gotham
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Size = UDim2.new(0.6, 0, 0, 20)
+    label.Position = UDim2.new(0.05, 0, 0, 0)
+
+    local track = Instance.new("Frame")
+    track.Parent = frame
+    track.BackgroundColor3 = Color3.fromRGB(70,70,70)
+    track.BorderSizePixel = 0
+    track.Size = UDim2.new(0.8, 0, 0, 6)
+    track.Position = UDim2.new(0.1, 0, 0.5, -3)
+
+    local fill = Instance.new("Frame")
+    fill.Parent = track
+    fill.BackgroundColor3 = Color3.fromRGB(0,120,255)
+    fill.BorderSizePixel = 0
+    fill.Size = UDim2.new(0, 0, 1, 0)
+    fill.Position = UDim2.new(0, 0, 0, 0)
+
+    local knob = Instance.new("TextButton")
+    knob.Parent = frame
+    knob.BackgroundColor3 = Color3.fromRGB(200,200,200)
+    knob.BorderSizePixel = 0
+    knob.Size = UDim2.new(0, 16, 0, 16)
+    knob.Position = UDim2.new(0.1, -8, 0.5, -8)
+    knob.Text = ""
+    knob.AutoButtonColor = false
+
+    local min = data.Min or 0
+    local max = data.Max or 100
+    local value = data.Default or min
+    local callback = data.Callback
+
+    local function updateSlider(val)
+        val = math.clamp(val, min, max)
+        value = val
+        local ratio = (val - min) / (max - min)
+        fill.Size = UDim2.new(ratio, 0, 1, 0)
+        knob.Position = UDim2.new(0.1 + ratio * 0.8, -8, 0.5, -8)
+        label.Text = data.Name .. ": " .. tostring(math.floor(val * 100) / 100)
+        if callback then callback(val) end
+    end
+
+    updateSlider(value)
+
+    local dragging = false
+    local connection = nil
+    knob.MouseButton1Down:Connect(function()
+        dragging = true
+        connection = RunService.RenderStepped:Connect(function()
+            if not dragging then return end
+            local mouse = player:GetMouse()
+            local absPos = track.AbsolutePosition
+            local absSize = track.AbsoluteSize
+            local x = math.clamp((mouse.X - absPos.X) / absSize.X, 0, 1)
+            local val = min + x * (max - min)
+            updateSlider(val)
+        end)
+    end)
+    knob.MouseButton1Up:Connect(function()
+        dragging = false
+        if connection then connection:Disconnect() connection = nil end
+    end)
+    knob.MouseLeave:Connect(function()
+        if dragging then
+            dragging = false
+            if connection then connection:Disconnect() connection = nil end
+        end
+    end)
+
+    local element = {
+        type = "Slider",
+        frame = frame,
+        label = label,
+        track = track,
+        fill = fill,
+        knob = knob,
+        min = min,
+        max = max,
+        value = value,
+        data = data,
+        update = updateSlider,
+        applyTheme = function(self, themeData)
+            label.TextColor3 = themeData.Text
+            track.BackgroundColor3 = themeData.SliderTrack
+            fill.BackgroundColor3 = themeData.SliderFill
+            knob.BackgroundColor3 = themeData.Button
+            knob.TextColor3 = themeData.Text
+        end
+    }
+    return element
+end
+
+-- ============ Dropdown ============
+function UIModule:createDropdown(parent, data)
+    local frame = Instance.new("Frame")
+    frame.Parent = parent
+    frame.BackgroundTransparency = 1
+    frame.Size = UDim2.new(1, 0, 0, 40)
+    frame.AutomaticSize = Enum.AutomaticSize.Y
+
+    local label = Instance.new("TextLabel")
+    label.Parent = frame
+    label.BackgroundTransparency = 1
+    label.Text = data.Name
+    label.TextColor3 = Color3.fromRGB(255,255,255)
+    label.TextSize = 16
+    label.Font = Enum.Font.Gotham
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Size = UDim2.new(0.3, 0, 1, 0)
+    label.Position = UDim2.new(0.05, 0, 0, 0)
+
+    local btn = Instance.new("TextButton")
+    btn.Parent = frame
+    btn.BackgroundColor3 = Color3.fromRGB(60,60,60)
+    btn.BorderSizePixel = 0
+    btn.Size = UDim2.new(0.5, 0, 0, 30)
+    btn.Position = UDim2.new(0.4, 0, 0.5, -15)
+    btn.Text = data.Default or "Select"
+    btn.TextColor3 = Color3.fromRGB(255,255,255)
+    btn.Font = Enum.Font.Gotham
+    btn.TextSize = 14
+    btn.AutoButtonColor = false
+
+    local dropdownFrame = Instance.new("Frame")
+    dropdownFrame.Parent = frame
+    dropdownFrame.BackgroundColor3 = Color3.fromRGB(50,50,50)
+    dropdownFrame.BorderSizePixel = 0
+    dropdownFrame.Size = UDim2.new(0.5, 0, 0, 0)
+    dropdownFrame.Position = UDim2.new(0.4, 0, 1, 0)
+    dropdownFrame.ClipsDescendants = true
+    dropdownFrame.Visible = false
+
+    local list = Instance.new("ScrollingFrame")
+    list.Parent = dropdownFrame
+    list.BackgroundTransparency = 1
+    list.Size = UDim2.new(1, 0, 1, 0)
+    list.Position = UDim2.new(0, 0, 0, 0)
+    list.CanvasSize = UDim2.new(0, 0, 0, 0)
+    list.ScrollBarThickness = 6
+    list.AutomaticCanvasSize = Enum.AutomaticSize.Y
+
+    local options = data.Options or {}
+    local multi = data.Multi or false
+    local selected = {}
+    local default = data.Default
+    if default then
+        if multi then
+            if type(default) == "table" then
+                for _, v in ipairs(default) do selected[v] = true end
+            else
+                selected[default] = true
+            end
+        else
+            if options[default] then
+                selected[default] = true
+            end
+        end
+    end
+
+    local function updateButtonText()
+        if multi then
+            local sel = {}
+            for opt, v in pairs(selected) do if v then table.insert(sel, opt) end end
+            btn.Text = #sel > 0 and table.concat(sel, ", ") or "None"
+        else
+            for opt, v in pairs(selected) do
+                if v then btn.Text = opt; return end
+            end
+            btn.Text = "Select"
+        end
+    end
+
+    local function createOption(opt)
+        local optBtn = Instance.new("TextButton")
+        optBtn.Parent = list
+        optBtn.BackgroundColor3 = Color3.fromRGB(60,60,60)
+        optBtn.BorderSizePixel = 0
+        optBtn.Size = UDim2.new(1, 0, 0, 30)
+        optBtn.Text = opt
+        optBtn.TextColor3 = Color3.fromRGB(255,255,255)
+        optBtn.Font = Enum.Font.Gotham
+        optBtn.TextSize = 14
+        optBtn.AutoButtonColor = false
+
+        if multi then
+            optBtn.Text = (selected[opt] and "✓ " or "") .. opt
+        end
+
+        optBtn.MouseButton1Click:Connect(function()
+            if multi then
+                selected[opt] = not selected[opt]
+                optBtn.Text = (selected[opt] and "✓ " or "") .. opt
+                updateButtonText()
+                if data.Callback then data.Callback(selected) end
+            else
+                for k in pairs(selected) do selected[k] = false end
+                selected[opt] = true
+                updateButtonText()
+                dropdownFrame.Visible = false
+                if data.Callback then data.Callback(opt) end
+            end
+        end)
+
+        return optBtn
+    end
+
+    for _, opt in ipairs(options) do
+        createOption(opt)
+    end
+
+    -- Toggle dropdown visibility
+    btn.MouseButton1Click:Connect(function()
+        dropdownFrame.Visible = not dropdownFrame.Visible
+        if dropdownFrame.Visible then
+            local count = #options
+            local height = math.min(count * 30, 200)
+            dropdownFrame.Size = UDim2.new(0.5, 0, 0, height)
+        end
+    end)
+
+    -- Close dropdown when clicking outside (simple: hide on any click outside)
+    local function closeDropdown()
+        dropdownFrame.Visible = false
+    end
+    -- We'll handle by listening to mouse clicks on the frame itself? Simpler: add a temporary connection.
+    local clickConn
+    btn.MouseButton1Click:Connect(function()
+        if dropdownFrame.Visible then
+            -- close on next click outside?
+        end
+    end)
+    -- Use a global click listener: any click outside dropdown closes it.
+    local function onGlobalClick(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            if dropdownFrame.Visible then
+                -- Check if click is inside dropdown or on button
+                local mouse = player:GetMouse()
+                if not dropdownFrame:IsAncestorOf(mouse.Target) and btn ~= mouse.Target and not btn:IsAncestorOf(mouse.Target) then
+                    dropdownFrame.Visible = false
+                end
+            end
+        end
+    end
+    local globalConn = UserInputService.InputBegan:Connect(onGlobalClick)
+
+    -- Store connection for cleanup
+    frame._globalConn = globalConn
+
+    local element = {
+        type = "Dropdown",
+        frame = frame,
+        label = label,
+        btn = btn,
+        dropdownFrame = dropdownFrame,
+        list = list,
+        options = options,
+        multi = multi,
+        selected = selected,
+        data = data,
+        updateButtonText = updateButtonText,
+        applyTheme = function(self, themeData)
+            label.TextColor3 = themeData.Text
+            btn.BackgroundColor3 = themeData.Button
+            btn.TextColor3 = themeData.Text
+            dropdownFrame.BackgroundColor3 = themeData.DropdownBg
+            for _, child in ipairs(list:GetChildren()) do
+                if child:IsA("TextButton") then
+                    child.BackgroundColor3 = themeData.DropdownItem
+                    child.TextColor3 = themeData.Text
+                end
+            end
+        end
+    }
+    return element
+end
+
+-- ============ Settings Tab ============
+function UIModule:addSettingsTab()
+    local settingsElements = {}
+
+    -- Theme dropdown
+    local themeOptions = {}
+    for name in pairs(Themes) do
+        table.insert(themeOptions, name)
+    end
+    table.sort(themeOptions)
+    settingsElements[#settingsElements+1] = {
+        Type = "Dropdown",
+        Name = "Theme",
+        Options = themeOptions,
+        Default = self.settings.Theme,
+        Multi = false,
+        Callback = function(choice)
+            self:setTheme(choice)
+        end
     }
 
-    -- Helper to deep copy table
-    local function deepCopy(original)
-        local copy = {}
-        for k, v in pairs(original) do
-            if type(v) == "table" then
-                copy[k] = deepCopy(v)
-            else
-                copy[k] = v
-            end
+    -- Toggle Key dropdown (common keys)
+    local keyOptions = {"RightControl", "LeftControl", "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12", "Insert", "Home", "PageUp", "Delete", "End", "PageDown"}
+    settingsElements[#settingsElements+1] = {
+        Type = "Dropdown",
+        Name = "Toggle Key",
+        Options = keyOptions,
+        Default = self.settings.ToggleKey,
+        Multi = false,
+        Callback = function(choice)
+            self:setToggleKey(choice)
         end
-        return copy
-    end
+    }
 
-    -- Merge tables
-    local function merge(t1, t2)
-        local result = deepCopy(t1)
-        for k, v in pairs(t2) do
-            result[k] = v
+    -- Size Ratio dropdown
+    local ratioOptions = {"1:1", "2:3", "3:4", "4:5", "5:6", "1:2", "1:3", "2:1", "3:1", "4:3", "16:9", "9:16"}
+    settingsElements[#settingsElements+1] = {
+        Type = "Dropdown",
+        Name = "Size Ratio",
+        Options = ratioOptions,
+        Default = self.settings.SizeRatio,
+        Multi = false,
+        Callback = function(choice)
+            self:setSizeRatio(choice)
         end
-        return result
-    end
+    }
 
-    -- Create a new UI instance
-    function UIManager.New(config)
-        config = config or {}
-        local self = setmetatable({}, UIManager)
-
-        self.config = {
-            title = config.title or "UI",
-            aspectRatio = config.aspectRatio or 3/4,
-            bindKey = config.bindKey or "RightShift",
-            theme = config.theme or "Dark",
-            savedTheme = nil, -- will be set if theme is table
-        }
-
-        -- If theme is a table, use it directly; else get from preset
-        if type(self.config.theme) == "table" then
-            self.theme = deepCopy(self.config.theme)
-            self.config.savedTheme = deepCopy(self.config.theme) -- store for saving
-        else
-            local preset = Themes[self.config.theme] or Themes.Dark
-            self.theme = deepCopy(preset)
-            self.config.savedTheme = deepCopy(preset)
-        end
-
-        self.tabs = {}          -- tab name -> tab object
-        self.tabOrder = {}      -- list of tab names
-        self.elements = {}      -- all elements for theme update
-        self.activeTab = nil
-        self.visible = false
-        self.bindKey = self.config.bindKey
-
-        -- Create GUI
-        self:createGui()
-        self:applyTheme()
-
-        -- Add default Settings tab (if not already added)
-        -- We'll add it later after creating tabs, but we can just create it when needed.
-        -- We'll add it automatically when the user first calls AddTab? Better to add it manually.
-        -- But we'll add it in the New, unless user already added "Settings"
-        -- We'll check if "Settings" exists, if not we add it.
-
-        -- Bind key listener
-        self:setupInput()
-
-        return self
-    end
-
-    function UIManager:createGui()
-        local player = Players.LocalPlayer
-        if not player then
-            warn("UI: No LocalPlayer found")
-            return
-        end
-        local playerGui = player:FindFirstChild("PlayerGui") or Instance.new("PlayerGui", player)
-
-        -- Main ScreenGui
-        local screenGui = Instance.new("ScreenGui")
-        screenGui.Name = "UIManager_Gui"
-        screenGui.Parent = playerGui
-        screenGui.ResetOnSpawn = false
-        self.screenGui = screenGui
-
-        -- Main Frame (the window)
-        local mainFrame = Instance.new("Frame")
-        mainFrame.Name = "MainFrame"
-        mainFrame.Parent = screenGui
-        mainFrame.BackgroundTransparency = 0.1
-        mainFrame.BorderSizePixel = 0
-        mainFrame.ClipsDescendants = true
-
-        -- Size: 60% of screen width, height determined by aspect ratio
-        -- We'll set size using UIAspectRatioConstraint
-        local aspectConstraint = Instance.new("UIAspectRatioConstraint")
-        aspectConstraint.Parent = mainFrame
-        aspectConstraint.AspectRatio = self.config.aspectRatio
-        aspectConstraint.DominantAxis = Enum.DominantAxis.Width
-
-        mainFrame.Size = UDim2.new(0.6, 0, 0, 0) -- width 60%, height auto
-        mainFrame.Position = UDim2.new(0.5, -0.3, 0.5, -0.3) -- center
-
-        -- Shadow (optional, we add a background with transparency)
-        -- We'll add a drop shadow using a transparent frame behind? Not needed.
-
-        -- Title (top-left)
-        local titleLabel = Instance.new("TextLabel")
-        titleLabel.Name = "Title"
-        titleLabel.Parent = mainFrame
-        titleLabel.Text = self.config.title
-        titleLabel.TextScaled = true
-        titleLabel.Font = Enum.Font.GothamBold
-        titleLabel.TextColor3 = Color3.new(1,1,1)
-        titleLabel.BackgroundTransparency = 1
-        titleLabel.Size = UDim2.new(0.5, 0, 0.1, 0)
-        titleLabel.Position = UDim2.new(0.02, 0, 0.01, 0)
-        titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-        self.titleLabel = titleLabel
-
-        -- Close button (top-right) - but we have a bind to hide, maybe add X
-        local closeBtn = Instance.new("TextButton")
-        closeBtn.Name = "CloseBtn"
-        closeBtn.Parent = mainFrame
-        closeBtn.Text = "✕"
-        closeBtn.TextScaled = true
-        closeBtn.Font = Enum.Font.Gotham
-        closeBtn.BackgroundColor3 = Color3.fromRGB(200,60,60)
-        closeBtn.BackgroundTransparency = 0.2
-        closeBtn.Size = UDim2.new(0.05, 0, 0.08, 0)
-        closeBtn.Position = UDim2.new(0.93, 0, 0.01, 0)
-        closeBtn.TextColor3 = Color3.new(1,1,1)
-        closeBtn.BorderSizePixel = 0
-        closeBtn.MouseButton1Click:Connect(function()
-            self:Toggle()
-        end)
-        self.closeBtn = closeBtn
-
-        -- Right panel: Tabs (vertical list)
-        local tabPanel = Instance.new("Frame")
-        tabPanel.Name = "TabPanel"
-        tabPanel.Parent = mainFrame
-        tabPanel.BackgroundTransparency = 0.3
-        tabPanel.Size = UDim2.new(0.2, 0, 1, 0)
-        tabPanel.Position = UDim2.new(0.8, 0, 0, 0)
-        tabPanel.BorderSizePixel = 0
-
-        -- Tab List (ScrollingFrame)
-        local tabScroller = Instance.new("ScrollingFrame")
-        tabScroller.Name = "TabScroller"
-        tabScroller.Parent = tabPanel
-        tabScroller.Size = UDim2.new(1, 0, 1, -0.05) -- leave room for scrollbar
-        tabScroller.Position = UDim2.new(0, 0, 0.03, 0)
-        tabScroller.BackgroundTransparency = 1
-        tabScroller.BorderSizePixel = 0
-        tabScroller.ScrollBarThickness = 4
-        tabScroller.ScrollBarImageColor3 = Color3.fromRGB(150,150,150)
-
-        local tabListLayout = Instance.new("UIListLayout")
-        tabListLayout.Parent = tabScroller
-        tabListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-        tabListLayout.Padding = UDim.new(0, 4)
-        tabListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-        self.tabScroller = tabScroller
-        self.tabListLayout = tabListLayout
-
-        -- Content panel (left side)
-        local contentPanel = Instance.new("Frame")
-        contentPanel.Name = "ContentPanel"
-        contentPanel.Parent = mainFrame
-        contentPanel.BackgroundTransparency = 1
-        contentPanel.Size = UDim2.new(0.78, 0, 1, 0)
-        contentPanel.Position = UDim2.new(0.01, 0, 0, 0)
-        contentPanel.ClipsDescendants = true
-        self.contentPanel = contentPanel
-
-        -- Store references
-        self.mainFrame = mainFrame
-        self.tabPanel = tabPanel
-
-        -- Initially hidden
-        mainFrame.Visible = false
-        self.visible = false
-
-        -- Handle resizing to keep aspect ratio on window resize
-        local function updateSize()
-            -- The aspect constraint handles it
-        end
-        -- Could listen to screen size changes but not needed
-    end
-
-    function UIManager:applyTheme()
-        local theme = self.theme
-        local mainFrame = self.mainFrame
-        if not mainFrame then return end
-
-        mainFrame.BackgroundColor3 = theme.Background
-        -- Title color
-        if self.titleLabel then
-            self.titleLabel.TextColor3 = theme.Text
-        end
-        -- Close button
-        if self.closeBtn then
-            self.closeBtn.BackgroundColor3 = theme.ToggleOff
-            self.closeBtn.TextColor3 = theme.Text
-        end
-        -- Tab panel
-        if self.tabPanel then
-            self.tabPanel.BackgroundColor3 = theme.BackgroundSecondary
-        end
-        -- Update all elements
-        for _, elem in ipairs(self.elements) do
-            if elem.updateTheme then
-                elem:updateTheme(theme)
-            end
-        end
-        -- Update tabs
-        for _, tab in pairs(self.tabs) do
-            if tab.updateTheme then
-                tab:updateTheme(theme)
-            end
-        end
-    end
-
-    function UIManager:setupInput()
-        -- Bind key for toggling visibility
-        local function onInputBegan(input, gameProcessed)
-            if gameProcessed then return end
-            if input.KeyCode == Enum.KeyCode[self.bindKey] then
-                self:Toggle()
-            end
-        end
-        self.inputConnection = UserInputService.InputBegan:Connect(onInputBegan)
-
-        -- Also handle global bind keys for toggles
-        -- We'll store toggle bindings and handle them here
-        self.toggleBindings = {} -- keyCode -> toggle function
-        local function onToggleInput(input, gameProcessed)
-            if gameProcessed then return end
-            local key = input.KeyCode
-            if key and self.toggleBindings[key] then
-                self.toggleBindings[key]()
-            end
-        end
-        self.toggleInputConnection = UserInputService.InputBegan:Connect(onToggleInput)
-    end
-
-    function UIManager:Toggle()
-        if self.visible then
-            self:Hide()
-        else
-            self:Show()
-        end
-    end
-
-    function UIManager:Show()
-        self.visible = true
-        self.mainFrame.Visible = true
-        -- Animate? optional
-    end
-
-    function UIManager:Hide()
-        self.visible = false
-        self.mainFrame.Visible = false
-    end
-
-    function UIManager:SetBindKey(newKey)
-        self.bindKey = newKey
-        -- Update in settings if needed
-    end
-
-    function UIManager:SetTheme(themeNameOrTable)
-        if type(themeNameOrTable) == "string" then
-            local preset = Themes[themeNameOrTable]
-            if preset then
-                self.theme = deepCopy(preset)
-            else
-                warn("UI: Theme not found, keeping current")
-                return
-            end
-        elseif type(themeNameOrTable) == "table" then
-            self.theme = deepCopy(themeNameOrTable)
-        else
-            return
-        end
-        self.config.savedTheme = deepCopy(self.theme) -- for saving
-        self:applyTheme()
-    end
-
-    function UIManager:GetTheme()
-        return deepCopy(self.theme)
-    end
-
-    function UIManager:AddTab(name)
-        if self.tabs[name] then
-            warn("UI: Tab '"..name.."' already exists")
-            return self.tabs[name]
-        end
-
-        -- Create tab object
-        local tab = {}
-        tab.name = name
-        tab.elements = {} -- list of elements in this tab
-        tab.parent = self
-        tab.contentFrame = nil
-
-        -- Create content frame inside contentPanel (but hidden initially)
-        local frame = Instance.new("Frame")
-        frame.Name = name.."_Content"
-        frame.Parent = self.contentPanel
-        frame.BackgroundTransparency = 1
-        frame.Size = UDim2.new(1, 0, 1, 0)
-        frame.Position = UDim2.new(0, 0, 0, 0)
-        frame.Visible = false -- hidden until selected
-        frame.ClipsDescendants = true
-
-        -- Add UIListLayout for elements
-        local layout = Instance.new("UIListLayout")
-        layout.Parent = frame
-        layout.SortOrder = Enum.SortOrder.LayoutOrder
-        layout.Padding = UDim.new(0, 6)
-        layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-
-        -- Also a ScrollingFrame inside? To support many elements, we can wrap in ScrollingFrame
-        local scroller = Instance.new("ScrollingFrame")
-        scroller.Name = "Scroller"
-        scroller.Parent = frame
-        scroller.Size = UDim2.new(1, 0, 1, 0)
-        scroller.BackgroundTransparency = 1
-        scroller.BorderSizePixel = 0
-        scroller.ScrollBarThickness = 4
-        scroller.ScrollBarImageColor3 = Color3.fromRGB(150,150,150)
-        -- Move layout to scroller
-        layout.Parent = scroller
-        -- Add a UIListLayout to scroller
-        local innerLayout = Instance.new("UIListLayout")
-        innerLayout.Parent = scroller
-        innerLayout.SortOrder = Enum.SortOrder.LayoutOrder
-        innerLayout.Padding = UDim.new(0, 6)
-        innerLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-        -- We'll use innerLayout for elements
-
-        -- Store scroller
-        tab.scroller = scroller
-        tab.layout = innerLayout
-
-        -- Create tab button in right panel
-        local btn = Instance.new("TextButton")
-        btn.Name = name.."_TabBtn"
-        btn.Parent = self.tabScroller
-        btn.Text = name
-        btn.TextScaled = true
-        btn.Font = Enum.Font.GothamBold
-        btn.BackgroundColor3 = self.theme.BackgroundSecondary
-        btn.BackgroundTransparency = 0.5
-        btn.Size = UDim2.new(0.9, 0, 0.08, 0) -- height relative to scroller
-        btn.Position = UDim2.new(0.05, 0, 0, 0)
-        btn.BorderSizePixel = 0
-        btn.TextColor3 = self.theme.Text
-        btn.AutoButtonColor = false
-
-        -- On click, activate tab
-        btn.MouseButton1Click:Connect(function()
-            self:ActivateTab(name)
-        end)
-
-        -- Hover effect
-        btn.MouseEnter:Connect(function()
-            btn.BackgroundColor3 = self.theme.AccentHover
-            btn.BackgroundTransparency = 0.3
-        end)
-        btn.MouseLeave:Connect(function()
-            if self.activeTab ~= name then
-                btn.BackgroundColor3 = self.theme.BackgroundSecondary
-                btn.BackgroundTransparency = 0.5
-            end
-        end)
-
-        tab.button = btn
-
-        -- Store tab
-        self.tabs[name] = tab
-        table.insert(self.tabOrder, name)
-
-        -- Update scroller canvas size
-        self:updateTabScroller()
-
-        -- If first tab, activate it
-        if #self.tabOrder == 1 then
-            self:ActivateTab(name)
-        end
-
-        return tab
-    end
-
-    function UIManager:updateTabScroller()
-        local count = #self.tabOrder
-        local height = count * 0.08 + (count-1)*0.02 + 0.1 -- each button 0.08, padding 0.02, plus margins
-        self.tabScroller.CanvasSize = UDim2.new(0, 0, height, 0)
-    end
-
-    function UIManager:ActivateTab(name)
-        if self.activeTab == name then return end
-        -- Hide previous
-        if self.activeTab then
-            local prev = self.tabs[self.activeTab]
-            if prev then
-                prev.scroller.Parent.Visible = false
-                prev.button.BackgroundColor3 = self.theme.BackgroundSecondary
-                prev.button.BackgroundTransparency = 0.5
-            end
-        end
-        -- Show new
-        local tab = self.tabs[name]
-        if tab then
-            tab.scroller.Parent.Visible = true
-            tab.button.BackgroundColor3 = self.theme.Accent
-            tab.button.BackgroundTransparency = 0.2
-            self.activeTab = name
-        end
-    end
-
-    -- Element creation functions
-
-    function UIManager:createElement(tab, elementType, params)
-        local frame = Instance.new("Frame")
-        frame.BackgroundTransparency = 1
-        frame.Size = UDim2.new(0.95, 0, 0, 0) -- height will be set
-        frame.AutomaticSize = Enum.AutomaticSize.Y
-
-        local layout = tab.layout
-        frame.Parent = tab.scroller
-        frame.LayoutOrder = #tab.elements + 1
-
-        -- Store element data for theme update
-        local element = {
-            frame = frame,
-            type = elementType,
-            params = params,
-            updateTheme = function(self, theme)
-                -- Implement in each element
-            end
-        }
-
-        -- Build element based on type
-        if elementType == "Toggle" then
-            -- Toggle with optional bind
-            local label = params.label or "Toggle"
-            local bindKey = params.bindKey
-            local default = params.default or false
-
-            local toggleFrame = Instance.new("Frame")
-            toggleFrame.Parent = frame
-            toggleFrame.BackgroundColor3 = self.theme.BackgroundSecondary
-            toggleFrame.BackgroundTransparency = 0.3
-            toggleFrame.Size = UDim2.new(1, 0, 0, 40)
-            toggleFrame.AutomaticSize = Enum.AutomaticSize.Y
-            toggleFrame.BorderSizePixel = 0
-            toggleFrame.ClipsDescendants = true
-
-            local labelText = Instance.new("TextLabel")
-            labelText.Parent = toggleFrame
-            labelText.Text = label
-            labelText.TextScaled = true
-            labelText.Font = Enum.Font.Gotham
-            labelText.TextColor3 = self.theme.Text
-            labelText.BackgroundTransparency = 1
-            labelText.Size = UDim2.new(0.6, 0, 1, 0)
-            labelText.Position = UDim2.new(0.02, 0, 0, 0)
-            labelText.TextXAlignment = Enum.TextXAlignment.Left
-
-            local toggleBtn = Instance.new("TextButton")
-            toggleBtn.Parent = toggleFrame
-            toggleBtn.Size = UDim2.new(0.2, 0, 0.6, 0)
-            toggleBtn.Position = UDim2.new(0.78, 0, 0.2, 0)
-            toggleBtn.Text = default and "ON" or "OFF"
-            toggleBtn.TextScaled = true
-            toggleBtn.Font = Enum.Font.GothamBold
-            toggleBtn.BackgroundColor3 = default and self.theme.ToggleOn or self.theme.ToggleOff
-            toggleBtn.BorderSizePixel = 0
-            toggleBtn.TextColor3 = self.theme.Text
-            toggleBtn.AutoButtonColor = false
-
-            local state = default
-            local function toggle()
-                state = not state
-                toggleBtn.Text = state and "ON" or "OFF"
-                toggleBtn.BackgroundColor3 = state and self.theme.ToggleOn or self.theme.ToggleOff
-                if params.callback then
-                    params.callback(state)
-                end
-            end
-
-            toggleBtn.MouseButton1Click:Connect(toggle)
-
-            -- Bind key if provided
-            if bindKey then
-                local key = Enum.KeyCode[bindKey]
-                if key then
-                    self.toggleBindings[key] = toggle
-                    -- Store reference to clean up later?
-                end
-            end
-
-            -- Store for theme update
-            element.updateTheme = function(self, theme)
-                labelText.TextColor3 = theme.Text
-                toggleBtn.TextColor3 = theme.Text
-                toggleFrame.BackgroundColor3 = theme.BackgroundSecondary
-                toggleBtn.BackgroundColor3 = state and theme.ToggleOn or theme.ToggleOff
-            end
-
-            element.toggleBtn = toggleBtn
-            element.state = state
-            element.toggle = toggle
-
-        elseif elementType == "Button" then
-            -- Simple button without state
-            local label = params.label or "Button"
-            local callback = params.callback
-
-            local btnFrame = Instance.new("Frame")
-            btnFrame.Parent = frame
-            btnFrame.BackgroundColor3 = self.theme.BackgroundSecondary
-            btnFrame.BackgroundTransparency = 0.3
-            btnFrame.Size = UDim2.new(1, 0, 0, 40)
-            btnFrame.AutomaticSize = Enum.AutomaticSize.Y
-            btnFrame.BorderSizePixel = 0
-
-            local btn = Instance.new("TextButton")
-            btn.Parent = btnFrame
-            btn.Size = UDim2.new(1, 0, 1, 0)
-            btn.Text = label
-            btn.TextScaled = true
-            btn.Font = Enum.Font.GothamBold
-            btn.BackgroundTransparency = 0.8
-            btn.BorderSizePixel = 0
-            btn.TextColor3 = self.theme.Text
-            btn.AutoButtonColor = false
-
-            btn.MouseEnter:Connect(function()
-                btn.BackgroundTransparency = 0.4
-            end)
-            btn.MouseLeave:Connect(function()
-                btn.BackgroundTransparency = 0.8
-            end)
-            btn.MouseButton1Click:Connect(function()
-                if callback then callback() end
-            end)
-
-            element.updateTheme = function(self, theme)
-                btn.TextColor3 = theme.Text
-                btnFrame.BackgroundColor3 = theme.BackgroundSecondary
-            end
-            element.button = btn
-
-        elseif elementType == "Slider" then
-            -- Slider with label and value display
-            local label = params.label or "Slider"
-            local min = params.min or 0
-            local max = params.max or 100
-            local default = params.default or (min+max)/2
-            local callback = params.callback
-
-            local sliderFrame = Instance.new("Frame")
-            sliderFrame.Parent = frame
-            sliderFrame.BackgroundColor3 = self.theme.BackgroundSecondary
-            sliderFrame.BackgroundTransparency = 0.3
-            sliderFrame.Size = UDim2.new(1, 0, 0, 50)
-            sliderFrame.AutomaticSize = Enum.AutomaticSize.Y
-            sliderFrame.BorderSizePixel = 0
-            sliderFrame.ClipsDescendants = true
-
-            local labelText = Instance.new("TextLabel")
-            labelText.Parent = sliderFrame
-            labelText.Text = label
-            labelText.TextScaled = true
-            labelText.Font = Enum.Font.Gotham
-            labelText.TextColor3 = self.theme.Text
-            labelText.BackgroundTransparency = 1
-            labelText.Size = UDim2.new(0.5, 0, 0.4, 0)
-            labelText.Position = UDim2.new(0.02, 0, 0.05, 0)
-            labelText.TextXAlignment = Enum.TextXAlignment.Left
-
-            local valueLabel = Instance.new("TextLabel")
-            valueLabel.Parent = sliderFrame
-            valueLabel.Text = tostring(default)
-            valueLabel.TextScaled = true
-            valueLabel.Font = Enum.Font.Gotham
-            valueLabel.TextColor3 = self.theme.Text
-            valueLabel.BackgroundTransparency = 1
-            valueLabel.Size = UDim2.new(0.2, 0, 0.4, 0)
-            valueLabel.Position = UDim2.new(0.78, 0, 0.05, 0)
-            valueLabel.TextXAlignment = Enum.TextXAlignment.Right
-
-            local slider = Instance.new("Frame")
-            slider.Parent = sliderFrame
-            slider.BackgroundColor3 = self.theme.Background
-            slider.Size = UDim2.new(0.9, 0, 0.2, 0)
-            slider.Position = UDim2.new(0.05, 0, 0.6, 0)
-            slider.BorderSizePixel = 0
-
-            local fill = Instance.new("Frame")
-            fill.Parent = slider
-            fill.BackgroundColor3 = self.theme.Accent
-            fill.Size = UDim2.new((default-min)/(max-min), 0, 1, 0)
-            fill.BorderSizePixel = 0
-
-            local dragBtn = Instance.new("TextButton")
-            dragBtn.Parent = slider
-            dragBtn.BackgroundColor3 = self.theme.Foreground
-            dragBtn.Size = UDim2.new(0.04, 0, 1.5, 0)
-            dragBtn.Position = UDim2.new((default-min)/(max-min) - 0.02, 0, -0.25, 0)
-            dragBtn.BorderSizePixel = 0
-            dragBtn.BackgroundTransparency = 0.2
-            dragBtn.Text = ""
-
-            local dragging = false
-            local function updateSlider(input)
-                local pos = input.Position.X - slider.AbsolutePosition.X
-                local width = slider.AbsoluteSize.X
-                local val = math.clamp(pos / width, 0, 1)
-                local value = min + val * (max - min)
-                value = math.floor(value + 0.5) -- integer
-                fill.Size = UDim2.new(val, 0, 1, 0)
-                dragBtn.Position = UDim2.new(val - 0.02, 0, -0.25, 0)
-                valueLabel.Text = tostring(value)
-                if callback then callback(value) end
-            end
-
-            dragBtn.MouseButton1Down:Connect(function()
-                dragging = true
-                dragBtn.BackgroundTransparency = 0
-            end)
-            dragBtn.MouseButton1Up:Connect(function()
-                dragging = false
-                dragBtn.BackgroundTransparency = 0.2
-            end)
-            dragBtn.MouseLeave:Connect(function()
-                if dragging then
-                    dragging = false
-                    dragBtn.BackgroundTransparency = 0.2
-                end
-            end)
-
-            UserInputService.InputChanged:Connect(function(input)
-                if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-                    updateSlider(input)
-                end
-            end)
-            -- Also touch support
-            UserInputService.TouchMoved:Connect(function(input)
-                if dragging then
-                    updateSlider(input)
-                end
-            end)
-
-            element.updateTheme = function(self, theme)
-                labelText.TextColor3 = theme.Text
-                valueLabel.TextColor3 = theme.Text
-                sliderFrame.BackgroundColor3 = theme.BackgroundSecondary
-                slider.BackgroundColor3 = theme.Background
-                fill.BackgroundColor3 = theme.Accent
-                dragBtn.BackgroundColor3 = theme.Foreground
-            end
-            element.slider = slider
-            element.fill = fill
-            element.dragBtn = dragBtn
-
-        elseif elementType == "Dropdown" then
-            -- Dropdown with multi-select option
-            local label = params.label or "Dropdown"
-            local items = params.items or {}
-            local multiSelect = params.multiSelect or false
-            local default = params.default or (multiSelect and {} or nil)
-
-            local dropdownFrame = Instance.new("Frame")
-            dropdownFrame.Parent = frame
-            dropdownFrame.BackgroundColor3 = self.theme.BackgroundSecondary
-            dropdownFrame.BackgroundTransparency = 0.3
-            dropdownFrame.Size = UDim2.new(1, 0, 0, 40)
-            dropdownFrame.AutomaticSize = Enum.AutomaticSize.Y
-            dropdownFrame.BorderSizePixel = 0
-            dropdownFrame.ClipsDescendants = true
-
-            local labelText = Instance.new("TextLabel")
-            labelText.Parent = dropdownFrame
-            labelText.Text = label
-            labelText.TextScaled = true
-            labelText.Font = Enum.Font.Gotham
-            labelText.TextColor3 = self.theme.Text
-            labelText.BackgroundTransparency = 1
-            labelText.Size = UDim2.new(0.5, 0, 0.4, 0)
-            labelText.Position = UDim2.new(0.02, 0, 0.05, 0)
-            labelText.TextXAlignment = Enum.TextXAlignment.Left
-
-            local selectedLabel = Instance.new("TextLabel")
-            selectedLabel.Parent = dropdownFrame
-            selectedLabel.Text = multiSelect and "Select..." or "None"
-            selectedLabel.TextScaled = true
-            selectedLabel.Font = Enum.Font.Gotham
-            selectedLabel.TextColor3 = self.theme.TextDim
-            selectedLabel.BackgroundTransparency = 1
-            selectedLabel.Size = UDim2.new(0.3, 0, 0.4, 0)
-            selectedLabel.Position = UDim2.new(0.68, 0, 0.05, 0)
-            selectedLabel.TextXAlignment = Enum.TextXAlignment.Right
-
-            local dropdownBtn = Instance.new("TextButton")
-            dropdownBtn.Parent = dropdownFrame
-            dropdownBtn.Size = UDim2.new(0.1, 0, 0.4, 0)
-            dropdownBtn.Position = UDim2.new(0.88, 0, 0.05, 0)
-            dropdownBtn.Text = "▼"
-            dropdownBtn.TextScaled = true
-            dropdownBtn.Font = Enum.Font.Gotham
-            dropdownBtn.BackgroundTransparency = 1
-            dropdownBtn.TextColor3 = self.theme.Text
-            dropdownBtn.BorderSizePixel = 0
-
-            -- Dropdown list (hidden initially)
-            local listFrame = Instance.new("Frame")
-            listFrame.Parent = dropdownFrame
-            listFrame.BackgroundColor3 = self.theme.Dropdown
-            listFrame.Size = UDim2.new(1, 0, 0, 0)
-            listFrame.Position = UDim2.new(0, 0, 0.5, 0)
-            listFrame.Visible = false
-            listFrame.BorderSizePixel = 0
-            listFrame.ClipsDescendants = true
-
-            local listScroller = Instance.new("ScrollingFrame")
-            listScroller.Parent = listFrame
-            listScroller.Size = UDim2.new(1, 0, 1, 0)
-            listScroller.BackgroundTransparency = 1
-            listScroller.BorderSizePixel = 0
-            listScroller.ScrollBarThickness = 4
-            listScroller.ScrollBarImageColor3 = Color3.fromRGB(150,150,150)
-
-            local listLayout = Instance.new("UIListLayout")
-            listLayout.Parent = listScroller
-            listLayout.SortOrder = Enum.SortOrder.LayoutOrder
-            listLayout.Padding = UDim.new(0, 2)
-
-            local selectedItems = {} -- for multiSelect, table of item:boolean
-
-            -- Function to update selected label
-            local function updateSelectedLabel()
-                if multiSelect then
-                    local count = 0
-                    for _, v in pairs(selectedItems) do if v then count = count + 1 end end
-                    selectedLabel.Text = (count > 0) and count.." selected" or "Select..."
-                else
-                    for _, v in pairs(selectedItems) do
-                        if v then
-                            selectedLabel.Text = v
-                            break
-                        end
-                    end
-                    if selectedLabel.Text == "" or selectedLabel.Text == "None" then
-                        selectedLabel.Text = "None"
-                    end
-                end
-            end
-
-            -- Create list items
-            local itemButtons = {}
-            for i, item in ipairs(items) do
-                local itemFrame = Instance.new("Frame")
-                itemFrame.Parent = listScroller
-                itemFrame.BackgroundColor3 = self.theme.BackgroundSecondary
-                itemFrame.BackgroundTransparency = 0.5
-                itemFrame.Size = UDim2.new(1, 0, 0, 30)
-                itemFrame.BorderSizePixel = 0
-
-                local checkBox = Instance.new("TextButton")
-                checkBox.Parent = itemFrame
-                checkBox.Size = UDim2.new(0.1, 0, 1, 0)
-                checkBox.Text = "☐"
-                checkBox.TextScaled = true
-                checkBox.Font = Enum.Font.Gotham
-                checkBox.BackgroundTransparency = 1
-                checkBox.TextColor3 = self.theme.Text
-                checkBox.BorderSizePixel = 0
-
-                local itemLabel = Instance.new("TextLabel")
-                itemLabel.Parent = itemFrame
-                itemLabel.Text = item
-                itemLabel.TextScaled = true
-                itemLabel.Font = Enum.Font.Gotham
-                itemLabel.TextColor3 = self.theme.Text
-                itemLabel.BackgroundTransparency = 1
-                itemLabel.Size = UDim2.new(0.85, 0, 1, 0)
-                itemLabel.Position = UDim2.new(0.1, 0, 0, 0)
-                itemLabel.TextXAlignment = Enum.TextXAlignment.Left
-
-                -- State
-                local isSelected = false
-                if multiSelect then
-                    if default and default[item] then
-                        isSelected = true
-                    end
-                else
-                    if default == item then
-                        isSelected = true
-                    end
-                end
-                selectedItems[item] = isSelected
-                checkBox.Text = isSelected and "☑" or "☐"
-
-                -- Toggle selection
-                local function toggleSelection()
-                    if multiSelect then
-                        selectedItems[item] = not selectedItems[item]
-                        checkBox.Text = selectedItems[item] and "☑" or "☐"
-                        -- Callback with all selected items
-                        local selected = {}
-                        for k, v in pairs(selectedItems) do
-                            if v then table.insert(selected, k) end
-                        end
-                        if params.callback then params.callback(selected) end
-                    else
-                        -- Single select: deselect others
-                        for k, v in pairs(selectedItems) do
-                            if k ~= item and v then
-                                selectedItems[k] = false
-                                -- update checkbox
-                                for _, btn in ipairs(itemButtons) do
-                                    if btn.item == k then
-                                        btn.checkBox.Text = "☐"
-                                    end
-                                end
-                            end
-                        end
-                        selectedItems[item] = true
-                        checkBox.Text = "☑"
-                        if params.callback then params.callback(item) end
-                    end
-                    updateSelectedLabel()
-                    -- Close list after selection? For single select maybe close
-                    if not multiSelect then
-                        listFrame.Visible = false
-                        dropdownFrame.Size = UDim2.new(1, 0, 0, 40)
-                    end
-                end
-
-                checkBox.MouseButton1Click:Connect(toggleSelection)
-                itemLabel.MouseButton1Click:Connect(toggleSelection)
-
-                table.insert(itemButtons, {frame = itemFrame, checkBox = checkBox, label = itemLabel, item = item})
-            end
-
-            -- Adjust list height based on item count (capped at 5 items)
-            local maxVisible = 5
-            local itemHeight = 30
-            local totalHeight = math.min(#items, maxVisible) * itemHeight
-            listFrame.Size = UDim2.new(1, 0, 0, totalHeight)
-
-            -- Show/Hide dropdown
-            local function toggleDropdown()
-                listFrame.Visible = not listFrame.Visible
-                if listFrame.Visible then
-                    dropdownFrame.Size = UDim2.new(1, 0, 0, 40 + totalHeight)
-                    listScroller.CanvasSize = UDim2.new(0, 0, #items * itemHeight, 0)
-                else
-                    dropdownFrame.Size = UDim2.new(1, 0, 0, 40)
-                end
-            end
-
-            dropdownBtn.MouseButton1Click:Connect(toggleDropdown)
-            -- Also close if clicked outside? Not necessary.
-
-            -- Update selected label initially
-            updateSelectedLabel()
-
-            element.updateTheme = function(self, theme)
-                labelText.TextColor3 = theme.Text
-                selectedLabel.TextColor3 = theme.TextDim
-                dropdownBtn.TextColor3 = theme.Text
-                dropdownFrame.BackgroundColor3 = theme.BackgroundSecondary
-                listFrame.BackgroundColor3 = theme.Dropdown
-                for _, btn in ipairs(itemButtons) do
-                    btn.frame.BackgroundColor3 = theme.BackgroundSecondary
-                    btn.label.TextColor3 = theme.Text
-                    btn.checkBox.TextColor3 = theme.Text
-                end
-            end
-
-            -- Store for later use
-            element.dropdownFrame = dropdownFrame
-            element.listFrame = listFrame
-            element.selectedItems = selectedItems
-            element.updateSelectedLabel = updateSelectedLabel
-        end
-
-        -- Add to tab's elements
-        table.insert(tab.elements, element)
-        -- Also add to global elements for theme update
-        table.insert(self.elements, element)
-
-        -- Update tab's scroller canvas size
-        local count = #tab.elements
-        tab.scroller.CanvasSize = UDim2.new(0, 0, count * 50 + (count-1)*6 + 20, 0) -- approximate
-
-        return element
-    end
-
-    -- Public methods on tab
-    function UIManager:AddToggle(label, bindKey, default, callback)
-        -- If current active tab? But we need tab object.
-        -- We'll add methods on tab objects.
-    end
-
-    -- We'll extend the tab object with methods
-    local tabMetatable = {}
-    function tabMetatable:AddToggle(label, bindKey, default, callback)
-        local params = {label=label, bindKey=bindKey, default=default, callback=callback}
-        return self.parent:createElement(self, "Toggle", params)
-    end
-    function tabMetatable:AddButton(label, callback)
-        local params = {label=label, callback=callback}
-        return self.parent:createElement(self, "Button", params)
-    end
-    function tabMetatable:AddSlider(label, min, max, default, callback)
-        local params = {label=label, min=min, max=max, default=default, callback=callback}
-        return self.parent:createElement(self, "Slider", params)
-    end
-    function tabMetatable:AddDropdown(label, items, multiSelect, default, callback)
-        local params = {label=label, items=items, multiSelect=multiSelect, default=default, callback=callback}
-        return self.parent:createElement(self, "Dropdown", params)
-    end
-
-    -- Override AddTab to return tab with metatable
-    local originalAddTab = UIManager.AddTab
-    function UIManager:AddTab(name)
-        local tab = originalAddTab(self, name)
-        if tab then
-            setmetatable(tab, {__index = tabMetatable})
-        end
-        return tab
-    end
-
-    -- Add Settings tab automatically
-    function UIManager:addSettingsTab()
-        local settingsTab = self:AddTab("Settings")
-        if not settingsTab then return end
-
-        -- Theme selection dropdown
-        local themeNames = {}
-        for name, _ in pairs(Themes) do
-            table.insert(themeNames, name)
-        end
-        settingsTab:AddDropdown("Theme", themeNames, false, self.config.theme, function(selected)
-            if selected then
-                self:SetTheme(selected)
-                -- Save theme to savedTheme
-                self.config.savedTheme = deepCopy(self.theme)
-                -- User can save via GetTheme later
-            end
-        end)
-
-        -- Bind key changer
-        local keys = {"RightShift", "LeftShift", "RightControl", "LeftControl", "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12"}
-        settingsTab:AddDropdown("Toggle Key", keys, false, self.bindKey, function(selected)
-            if selected then
-                self:SetBindKey(selected)
-            end
-        end)
-
-        -- Add a button to save theme (for user convenience)
-        settingsTab:AddButton("Copy Theme to Clipboard", function()
-            local themeJson = HttpService:JSONEncode(self.theme)
-            setclipboard(themeJson) -- if available
-            warn("Theme JSON copied to clipboard (if setclipboard is available)")
-        end)
-        settingsTab:AddButton("Apply Saved Theme", function()
-            -- In practice, user would load from their saved data
-            -- We'll just show a message
-            warn("Use ui:SetTheme(themeTable) to apply a saved theme.")
-        end)
-    end
-
-    -- After creating UI, add settings tab
-    -- But we need to do it after the object is fully initialized.
-    -- We'll call it from New
-    local function init(self)
-        self:addSettingsTab()
-        -- Apply theme after all elements created
-        self:applyTheme()
-    end
-
-    -- Override New to call init
-    local oldNew = UIManager.New
-    function UIManager.New(config)
-        local self = oldNew(config)
-        init(self)
-        return self
-    end
-
-    return UIManager
+    self:addTab("Settings", settingsElements)
 end
+
+-- ============ Theme & Settings ============
+function UIModule:setTheme(themeName)
+    if not Themes[themeName] then return end
+    self.theme = themeName
+    self.settings.Theme = themeName
+    saveSettings(self.settings)
+    self:applyTheme(themeName)
+end
+
+function UIModule:applyTheme(themeName)
+    self.themeData = Themes[themeName] or Themes.Dark
+    -- Apply to main frame
+    self.mainFrame.BackgroundColor3 = self.themeData.Background
+    self.titleBar.BackgroundColor3 = self.themeData.TabSelected
+    self.titleLabel.TextColor3 = self.themeData.Text
+    self.tabsPanel.BackgroundColor3 = self.themeData.Panel
+    self.contentPanel.BackgroundColor3 = self.themeData.Panel
+    self.closeButton.TextColor3 = self.themeData.Text
+
+    -- Apply to tab buttons
+    for name, btn in pairs(self.tabButtons) do
+        btn.BackgroundColor3 = (name == self.currentTab) and self.themeData.TabSelected or self.themeData.Tab
+        btn.TextColor3 = self.themeData.Text
+    end
+
+    -- Apply to all elements in all tabs
+    for tabName, elemList in pairs(self.elements) do
+        for _, elem in ipairs(elemList) do
+            self:applyThemeToElement(elem)
+        end
+    end
+end
+
+function UIModule:applyThemeToElement(element)
+    if element.applyTheme then
+        element:applyTheme(self.themeData)
+    end
+end
+
+function UIModule:setToggleKey(keyName)
+    local key = getKeyEnum(keyName)
+    if not key then return end
+    self.settings.ToggleKey = keyName
+    saveSettings(self.settings)
+    self:setupToggleKey()
+end
+
+function UIModule:setupToggleKey()
+    if self.toggleConnection then
+        self.toggleConnection:Disconnect()
+        self.toggleConnection = nil
+    end
+    local key = getKeyEnum(self.settings.ToggleKey)
+    if key then
+        self.toggleConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+            if gameProcessed then return end
+            if input.KeyCode == key then
+                self:toggleVisibility()
+            end
+        end)
+    end
+end
+
+function UIModule:setSizeRatio(ratioStr)
+    self.settings.SizeRatio = ratioStr
+    saveSettings(self.settings)
+    self.aspectConstraint.AspectRatio = parseRatio(ratioStr)
+end
+
+-- ============ Visibility ============
+function UIModule:toggleVisibility()
+    self.visible = not self.visible
+    self.mainFrame.Visible = self.visible
+end
+
+function UIModule:setVisible(vis)
+    self.visible = vis
+    self.mainFrame.Visible = vis
+end
+
+-- ============ Destruction ============
+function UIModule:destroy()
+    if self.gui then
+        self.gui:Destroy()
+    end
+    if self.toggleConnection then
+        self.toggleConnection:Disconnect()
+        self.toggleConnection = nil
+    end
+    -- Cleanup any global connections stored in elements
+    for tabName, elemList in pairs(self.elements) do
+        for _, elem in ipairs(elemList) do
+            if elem.frame and elem.frame._bindConnection then
+                elem.frame._bindConnection:Disconnect()
+            end
+            if elem.frame and elem.frame._globalConn then
+                elem.frame._globalConn:Disconnect()
+            end
+        end
+    end
+end
+
+-- ============ Return ============
+return UIModule
