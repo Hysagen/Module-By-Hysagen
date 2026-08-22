@@ -164,19 +164,24 @@ local function createMainFrame(title)
     pagesContainer.BackgroundTransparency = 1
     pagesContainer.Parent = pagesScrolling
     
-    -- Обновляем CanvasSize при изменении контента
-    local function updatePagesCanvas()
-        local totalHeight = 0
-        for _, data in pairs(pages) do
-            if data.Frame.Visible then
-                totalHeight = totalHeight + data.Frame.Size.Y.Offset
-            end
-        end
-        pagesScrolling.CanvasSize = UDim2.new(0, 0, 0, totalHeight + 16)
-    end
-    
     local pages = {}
     local activePage = nil
+    
+    -- Функция обновления CanvasSize
+    local function updatePagesCanvas()
+        if not pages or next(pages) == nil then
+            pagesScrolling.CanvasSize = UDim2.new(0, 0, 0, 16)
+            return
+        end
+        
+        local totalHeight = 16
+        for _, data in pairs(pages) do
+            if data.Frame and data.Frame.Visible then
+                totalHeight = totalHeight + data.Frame.Size.Y.Offset + 4
+            end
+        end
+        pagesScrolling.CanvasSize = UDim2.new(0, 0, 0, totalHeight)
+    end
     
     -- === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
     local function createElementContainer(parent)
@@ -184,12 +189,31 @@ local function createMainFrame(title)
         frame.Size = UDim2.new(1, 0, 0, 44)
         frame.BackgroundTransparency = 1
         frame.Parent = parent
+        
+        -- Обновляем размер страницы при добавлении элементов
+        task.wait(0.05)
+        if parent and parent.Parent then
+            -- Находим страницу
+            local page = parent
+            while page and page.Name ~= "PageFrame" and not page:IsA("ScrollingFrame") do
+                page = page.Parent
+            end
+            if page and page.Parent and pages then
+                for name, data in pairs(pages) do
+                    if data.Frame == page then
+                        updatePagesCanvas()
+                        break
+                    end
+                end
+            end
+        end
+        
         return frame
     end
     
     -- === 1) КНОПКА С БИНДОМ (выключена по умолчанию) ===
     function UIFramework:CreateToggleWithBind(page, label, defaultState, bindKey)
-        defaultState = defaultState or false -- ВЫКЛЮЧЕНА ПО УМОЛЧАНИЮ
+        defaultState = defaultState or false
         local container = createElementContainer(page)
         
         local toggleFrame = Instance.new("Frame")
@@ -248,7 +272,7 @@ local function createMainFrame(title)
             end
         end)
         
-        -- Обновляем размер страницы
+        task.wait(0.05)
         updatePagesCanvas()
         
         return {
@@ -265,7 +289,7 @@ local function createMainFrame(title)
     
     -- === 2) КНОПКА БЕЗ БИНДА (выключена по умолчанию) ===
     function UIFramework:CreateToggle(page, label, defaultState)
-        defaultState = defaultState or false -- ВЫКЛЮЧЕНА ПО УМОЛЧАНИЮ
+        defaultState = defaultState or false
         local container = createElementContainer(page)
         
         local toggleFrame = Instance.new("Frame")
@@ -316,6 +340,7 @@ local function createMainFrame(title)
         
         btn.MouseButton1Click:Connect(toggle)
         
+        task.wait(0.05)
         updatePagesCanvas()
         
         return {
@@ -437,6 +462,7 @@ local function createMainFrame(title)
             end
         end)
         
+        task.wait(0.05)
         updatePagesCanvas()
         
         return {
@@ -466,7 +492,7 @@ local function createMainFrame(title)
         mainBtn.TextXAlignment = Enum.TextXAlignment.Left
         mainBtn.Font = Enum.Font.GothamSemibold
         mainBtn.Parent = container
-        mainBtn.ZIndex = 2 -- Поверх всего
+        mainBtn.ZIndex = 2
         
         local mainCorner = Instance.new("UICorner")
         mainCorner.CornerRadius = UDim.new(0, 4)
@@ -484,7 +510,6 @@ local function createMainFrame(title)
         arrow.Parent = mainBtn
         arrow.ZIndex = 2
         
-        -- Выпадающий список (поверх всего)
         local listFrame = Instance.new("Frame")
         listFrame.Size = UDim2.new(1, -16, 0, 0)
         listFrame.Position = UDim2.new(0, 8, 0, 40)
@@ -493,7 +518,7 @@ local function createMainFrame(title)
         listFrame.BorderSizePixel = 0
         listFrame.Visible = false
         listFrame.Parent = container
-        listFrame.ZIndex = 10 -- Высокий zIndex, чтобы быть поверх всего
+        listFrame.ZIndex = 10
         
         local listCorner = Instance.new("UICorner")
         listCorner.CornerRadius = UDim.new(0, 4)
@@ -546,6 +571,7 @@ local function createMainFrame(title)
             end
             listFrame.Size = UDim2.new(1, -16, 0, math.min(count * 30 + 4, 200))
             container.Size = UDim2.new(1, 0, 0, 44 + (isOpen and listFrame.Size.Y.Offset or 0))
+            task.wait(0.05)
             updatePagesCanvas()
         end
         
@@ -638,6 +664,7 @@ local function createMainFrame(title)
         
         updateMainText()
         updateListSize()
+        task.wait(0.05)
         updatePagesCanvas()
         
         return {
@@ -690,8 +717,8 @@ local function createMainFrame(title)
     -- === СТРАНИЦЫ ===
     function UIFramework:CreatePage(name)
         local pageFrame = Instance.new("Frame")
-        pageFrame.Name = name
-        pageFrame.Size = UDim2.new(1, 0, 0, 0) -- Высота будет меняться
+        pageFrame.Name = "PageFrame"
+        pageFrame.Size = UDim2.new(1, 0, 0, 0)
         pageFrame.BackgroundTransparency = 1
         pageFrame.Visible = false
         pageFrame.Parent = pagesContainer
@@ -701,19 +728,17 @@ local function createMainFrame(title)
         pageLayout.SortOrder = Enum.SortOrder.LayoutOrder
         pageLayout.Parent = pageFrame
         
-        -- Обновляем размер страницы при добавлении элементов
         local function updatePageSize()
-            local totalHeight = 0
+            local totalHeight = 16
             for _, child in ipairs(pageFrame:GetChildren()) do
                 if child:IsA("Frame") then
-                    totalHeight = totalHeight + child.Size.Y.Offset
+                    totalHeight = totalHeight + child.Size.Y.Offset + 4
                 end
             end
-            pageFrame.Size = UDim2.new(1, 0, 0, totalHeight + 16)
+            pageFrame.Size = UDim2.new(1, 0, 0, totalHeight)
             updatePagesCanvas()
         end
         
-        -- Отслеживаем изменения размера
         pageFrame.ChildAdded:Connect(function()
             task.wait(0.05)
             updatePageSize()
@@ -738,7 +763,6 @@ local function createMainFrame(title)
         tabCorner.CornerRadius = UDim.new(0, 4)
         tabCorner.Parent = tabBtn
         
-        -- Обновляем CanvasSize левой панели
         leftScrolling.CanvasSize = UDim2.new(0, 0, 0, leftScrolling.CanvasSize.Y.Offset + 40)
         
         tabBtn.MouseButton1Click:Connect(function()
@@ -753,7 +777,10 @@ local function createMainFrame(title)
         }
         
         if not activePage then
-            UIFramework:SwitchPage(name)
+            activePage = name
+            pageFrame.Visible = true
+            tabBtn.BackgroundColor3 = COLORS.TabActive
+            tabBtn.TextColor3 = COLORS.Text
         end
         
         task.wait(0.1)
@@ -776,7 +803,6 @@ local function createMainFrame(title)
         pages[name].Button.TextColor3 = COLORS.Text
         activePage = name
         
-        -- Обновляем CanvasSize
         task.wait(0.05)
         pages[name]:UpdateSize()
         updatePagesCanvas()
@@ -831,5 +857,3 @@ end
 function UIFramework.New(title)
     return createMainFrame(title or "UI Framework")
 end
-
-return UIFramework
