@@ -335,9 +335,8 @@ local function createMainFrame(title)
         }
     end
     
-    -- === 3) ПОЛЗУНОК ===
-    function UIFramework:CreateSlider(page, label, min, max, default, decimals)
-        decimals = decimals or 0
+    -- === 3) ПОЛЗУНОК (целочисленный, с ручкой) ===
+    function UIFramework:CreateSlider(page, label, min, max, default)
         local container = createElementContainer(page)
         container.Size = UDim2.new(1, 0, 0, 54)
         
@@ -375,6 +374,7 @@ local function createMainFrame(title)
         valueLabel.Font = Enum.Font.GothamBold
         valueLabel.Parent = sliderFrame
         
+        -- Полоса
         local slider = Instance.new("Frame")
         slider.Size = UDim2.new(0.9, 0, 0, 4)
         slider.Position = UDim2.new(0.05, 0, 1, -10)
@@ -387,6 +387,7 @@ local function createMainFrame(title)
         sliderCorner.CornerRadius = UDim.new(0, 2)
         sliderCorner.Parent = slider
         
+        -- Заполнение
         local fill = Instance.new("Frame")
         fill.Size = UDim2.new(0.5, 0, 1, 0)
         fill.BackgroundColor3 = COLORS.Accent
@@ -398,20 +399,42 @@ local function createMainFrame(title)
         fillCorner.CornerRadius = UDim.new(0, 2)
         fillCorner.Parent = fill
         
+        -- Ручка (круглая точка)
+        local handle = Instance.new("Frame")
+        handle.Size = UDim2.new(0, 16, 0, 16)
+        handle.Position = UDim2.new(0.5, -8, 0.5, -8)
+        handle.BackgroundColor3 = COLORS.Accent
+        handle.BackgroundTransparency = 0
+        handle.BorderSizePixel = 0
+        handle.Parent = fill
+        
+        local handleCorner = Instance.new("UICorner")
+        handleCorner.CornerRadius = UDim.new(1, 0)
+        handleCorner.Parent = handle
+        
+        -- Обводка ручки (белая)
+        local handleBorder = Instance.new("Frame")
+        handleBorder.Size = UDim2.new(1, 0, 1, 0)
+        handleBorder.BackgroundColor3 = COLORS.Text
+        handleBorder.BackgroundTransparency = 0
+        handleBorder.BorderSizePixel = 0
+        handleBorder.Parent = handle
+        
+        local handleBorderCorner = Instance.new("UICorner")
+        handleBorderCorner.CornerRadius = UDim.new(1, 0)
+        handleBorderCorner.Parent = handleBorder
+        
         if type(default) == "table" then
             default = min
         end
         default = default or min
         
-        local value = default
+        local value = math.round(default)
         local function updateSlider(newValue)
             if type(newValue) == "table" then
                 newValue = min
             end
-            value = math.clamp(newValue, min, max)
-            if decimals == 0 then
-                value = math.round(value)
-            end
+            value = math.round(math.clamp(newValue, min, max))
             local percentage = (value - min) / (max - min)
             fill.Size = UDim2.new(percentage, 0, 1, 0)
             valueLabel.Text = tostring(value)
@@ -420,28 +443,41 @@ local function createMainFrame(title)
         updateSlider(value)
         
         local dragging = false
-        slider.InputBegan:Connect(function(input)
+        local function startDrag(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 then
                 dragging = true
                 local percentage = math.clamp((input.Position.X - slider.AbsolutePosition.X) / slider.AbsoluteSize.X, 0, 1)
                 local newValue = min + (max - min) * percentage
                 updateSlider(newValue)
             end
-        end)
+        end
         
-        game:GetService("UserInputService").InputChanged:Connect(function(input)
+        local function moveDrag(input)
             if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
                 local percentage = math.clamp((input.Position.X - slider.AbsolutePosition.X) / slider.AbsoluteSize.X, 0, 1)
                 local newValue = min + (max - min) * percentage
                 updateSlider(newValue)
             end
-        end)
+        end
         
-        game:GetService("UserInputService").InputEnded:Connect(function(input)
+        local function endDrag(input)
             if input.UserInputType == Enum.UserInputType.MouseButton1 then
                 dragging = false
             end
-        end)
+        end
+        
+        -- События на полосу
+        slider.InputBegan:Connect(startDrag)
+        slider.InputEnded:Connect(endDrag)
+        
+        -- События на ручку
+        handle.InputBegan:Connect(startDrag)
+        handle.InputEnded:Connect(endDrag)
+        handleBorder.InputBegan:Connect(startDrag)
+        handleBorder.InputEnded:Connect(endDrag)
+        
+        game:GetService("UserInputService").InputChanged:Connect(moveDrag)
+        game:GetService("UserInputService").InputEnded:Connect(endDrag)
         
         task.wait(0.05)
         updatePagesCanvas()
@@ -452,7 +488,7 @@ local function createMainFrame(title)
         }
     end
     
-    -- === 4) КНОПКА-СПИСОК (С ScrollingFrame внутри) ===
+    -- === 4) КНОПКА-СПИСОК ===
     function UIFramework:CreateDropdown(page, label, options, defaultOption, multiSelect)
         multiSelect = multiSelect or false
         
@@ -795,8 +831,7 @@ local function createMainFrame(title)
             if data and data.Button then
                 data.Button.BackgroundColor3 = COLORS.TabInactive
                 data.Button.TextColor3 = COLORS.TextDim
-            end
-        end
+            end        end
         
         if pages[name] and pages[name].Frame then
             pages[name].Frame.Visible = true
