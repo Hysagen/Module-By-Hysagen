@@ -1,13 +1,12 @@
 -- Название модуля: UIFramework
 local UIFramework = {}
 
--- Конфиг для красоты
 local COLORS = {
     Background = Color3.fromRGB(30, 30, 36),
     TopBar = Color3.fromRGB(45, 45, 54),
     Accent = Color3.fromRGB(0, 150, 255),
-    TabInactive = Color3.fromRGB(45, 45, 54),
-    TabActive = Color3.fromRGB(60, 60, 72),
+    TabInactive = Color3.fromRGB(40, 40, 48),
+    TabActive = Color3.fromRGB(55, 55, 65),
     Text = Color3.fromRGB(255, 255, 255),
     TextDim = Color3.fromRGB(180, 180, 195),
 }
@@ -29,7 +28,7 @@ local function createMainFrame(title)
     mainFrame.ClipsDescendants = true
     mainFrame.Parent = screenGui
     
-    -- Скругление углов (единое для всего mainFrame)
+    -- Скругление всех углов у mainFrame
     local mainCorner = Instance.new("UICorner")
     mainCorner.CornerRadius = UDim.new(0, 8)
     mainCorner.Parent = mainFrame
@@ -48,7 +47,7 @@ local function createMainFrame(title)
     shadowCorner.CornerRadius = UDim.new(0, 8)
     shadowCorner.Parent = shadow
     
-    -- Верхняя панель (для перетаскивания)
+    -- Верхняя панель
     local topBar = Instance.new("Frame")
     topBar.Name = "TopBar"
     topBar.Size = UDim2.new(1, 0, 0, 36)
@@ -56,6 +55,20 @@ local function createMainFrame(title)
     topBar.BackgroundTransparency = 0
     topBar.BorderSizePixel = 0
     topBar.Parent = mainFrame
+    
+    -- Отдельный UICorner для topBar (только верхние углы)
+    local topCorner = Instance.new("UICorner")
+    topCorner.CornerRadius = UDim.new(0, 8)
+    topCorner.Parent = topBar
+    
+    -- Маскируем нижние углы topBar (чтобы не перекрывали mainFrame)
+    local topMask = Instance.new("Frame")
+    topMask.Size = UDim2.new(1, 0, 0, 8)
+    topMask.Position = UDim2.new(0, 0, 1, -8)
+    topMask.BackgroundColor3 = topBar.BackgroundColor3
+    topMask.BackgroundTransparency = 0
+    topMask.BorderSizePixel = 0
+    topMask.Parent = topBar
     
     -- Заголовок
     local titleLabel = Instance.new("TextLabel")
@@ -91,10 +104,11 @@ local function createMainFrame(title)
     container.BackgroundTransparency = 1
     container.Parent = mainFrame
     
-    -- ЛЕВАЯ ПАНЕЛЬ
+    -- ЛЕВАЯ ПАНЕЛЬ (с отступами)
     local leftPanel = Instance.new("Frame")
     leftPanel.Name = "LeftPanel"
     leftPanel.Size = UDim2.new(0, 180, 1, 0)
+    leftPanel.Position = UDim2.new(0, 0, 0, 0)
     leftPanel.BackgroundColor3 = Color3.fromRGB(40, 40, 48)
     leftPanel.BackgroundTransparency = 0
     leftPanel.BorderSizePixel = 0
@@ -105,7 +119,7 @@ local function createMainFrame(title)
     leftCorner.CornerRadius = UDim.new(0, 8)
     leftCorner.Parent = leftPanel
     
-    -- Маскируем правые углы левой панели (чтобы не перекрывали правую)
+    -- Маскируем правую сторону левой панели (чтобы стык с правой панелью был ровным)
     local leftMask = Instance.new("Frame")
     leftMask.Size = UDim2.new(0, 8, 1, 0)
     leftMask.Position = UDim2.new(1, -8, 0, 0)
@@ -144,7 +158,7 @@ local function createMainFrame(title)
     rightCorner.CornerRadius = UDim.new(0, 8)
     rightCorner.Parent = rightPanel
     
-    -- Маскируем левые углы правой панели
+    -- Маскируем левую сторону правой панели
     local rightMask = Instance.new("Frame")
     rightMask.Size = UDim2.new(0, 8, 1, 0)
     rightMask.Position = UDim2.new(0, 0, 0, 0)
@@ -156,11 +170,11 @@ local function createMainFrame(title)
     -- Контейнер для страниц
     local pagesContainer = Instance.new("Frame")
     pagesContainer.Name = "PagesContainer"
-    pagesContainer.Size = UDim2.new(1, 0, 1, 0)
+    pagesContainer.Size = UDim2.new(1, -16, 1, -16)
+    pagesContainer.Position = UDim2.new(0, 8, 0, 8)
     pagesContainer.BackgroundTransparency = 1
     pagesContainer.Parent = rightPanel
     
-    -- Словарь для хранения страниц
     local pages = {}
     local activePage = nil
     
@@ -179,14 +193,15 @@ local function createMainFrame(title)
         pageLayout.SortOrder = Enum.SortOrder.LayoutOrder
         pageLayout.Parent = pageFrame
         
+        -- Кнопка в левой панели с отступом слева
         local tabBtn = Instance.new("TextButton")
         tabBtn.Name = name .. "Tab"
-        tabBtn.Size = UDim2.new(1, -12, 0, 36)
-        tabBtn.Position = UDim2.new(0, 6, 0, 0)
+        tabBtn.Size = UDim2.new(1, -16, 0, 36)
+        tabBtn.Position = UDim2.new(0, 8, 0, 0)
         tabBtn.BackgroundColor3 = COLORS.TabInactive
         tabBtn.BackgroundTransparency = 0
         tabBtn.BorderSizePixel = 0
-        tabBtn.Text = name
+        tabBtn.Text = "  " .. name
         tabBtn.TextColor3 = COLORS.TextDim
         tabBtn.TextSize = 14
         tabBtn.TextXAlignment = Enum.TextXAlignment.Left
