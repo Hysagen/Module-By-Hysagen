@@ -107,6 +107,7 @@ local function createMainFrame(title)
     leftMask.BorderSizePixel = 0
     leftMask.Parent = leftPanel
     
+    -- Скроллинг для левой панели (кнопки страниц)
     local leftScrolling = Instance.new("ScrollingFrame")
     leftScrolling.Size = UDim2.new(1, 0, 1, 0)
     leftScrolling.BackgroundTransparency = 1
@@ -145,12 +146,34 @@ local function createMainFrame(title)
     rightMask.BorderSizePixel = 0
     rightMask.Parent = rightPanel
     
+    -- Контейнер для страниц с ScrollingFrame
+    local pagesScrolling = Instance.new("ScrollingFrame")
+    pagesScrolling.Name = "PagesScrolling"
+    pagesScrolling.Size = UDim2.new(1, 0, 1, 0)
+    pagesScrolling.BackgroundTransparency = 1
+    pagesScrolling.BorderSizePixel = 0
+    pagesScrolling.ScrollBarThickness = 6
+    pagesScrolling.ScrollBarImageColor3 = COLORS.Accent
+    pagesScrolling.CanvasSize = UDim2.new(0, 0, 0, 0)
+    pagesScrolling.Parent = rightPanel
+    
     local pagesContainer = Instance.new("Frame")
     pagesContainer.Name = "PagesContainer"
-    pagesContainer.Size = UDim2.new(1, -16, 1, -16)
-    pagesContainer.Position = UDim2.new(0, 8, 0, 8)
+    pagesContainer.Size = UDim2.new(1, -16, 1, 0)
+    pagesContainer.Position = UDim2.new(0, 8, 0, 0)
     pagesContainer.BackgroundTransparency = 1
-    pagesContainer.Parent = rightPanel
+    pagesContainer.Parent = pagesScrolling
+    
+    -- Обновляем CanvasSize при изменении контента
+    local function updatePagesCanvas()
+        local totalHeight = 0
+        for _, data in pairs(pages) do
+            if data.Frame.Visible then
+                totalHeight = totalHeight + data.Frame.Size.Y.Offset
+            end
+        end
+        pagesScrolling.CanvasSize = UDim2.new(0, 0, 0, totalHeight + 16)
+    end
     
     local pages = {}
     local activePage = nil
@@ -164,8 +187,9 @@ local function createMainFrame(title)
         return frame
     end
     
-    -- === 1) КНОПКА С БИНДОМ ===
+    -- === 1) КНОПКА С БИНДОМ (выключена по умолчанию) ===
     function UIFramework:CreateToggleWithBind(page, label, defaultState, bindKey)
+        defaultState = defaultState or false -- ВЫКЛЮЧЕНА ПО УМОЛЧАНИЮ
         local container = createElementContainer(page)
         
         local toggleFrame = Instance.new("Frame")
@@ -191,7 +215,7 @@ local function createMainFrame(title)
         labelText.Font = Enum.Font.GothamSemibold
         labelText.Parent = toggleFrame
         
-        local state = defaultState or false
+        local state = defaultState
         local btn = Instance.new("TextButton")
         btn.Size = UDim2.new(0, 60, 0, 28)
         btn.Position = UDim2.new(1, -68, 0.5, -14)
@@ -224,6 +248,9 @@ local function createMainFrame(title)
             end
         end)
         
+        -- Обновляем размер страницы
+        updatePagesCanvas()
+        
         return {
             Toggle = toggle,
             SetState = function(newState)
@@ -236,8 +263,9 @@ local function createMainFrame(title)
         }
     end
     
-    -- === 2) КНОПКА БЕЗ БИНДА ===
+    -- === 2) КНОПКА БЕЗ БИНДА (выключена по умолчанию) ===
     function UIFramework:CreateToggle(page, label, defaultState)
+        defaultState = defaultState or false -- ВЫКЛЮЧЕНА ПО УМОЛЧАНИЮ
         local container = createElementContainer(page)
         
         local toggleFrame = Instance.new("Frame")
@@ -263,7 +291,7 @@ local function createMainFrame(title)
         labelText.Font = Enum.Font.GothamSemibold
         labelText.Parent = toggleFrame
         
-        local state = defaultState or false
+        local state = defaultState
         local btn = Instance.new("TextButton")
         btn.Size = UDim2.new(0, 60, 0, 28)
         btn.Position = UDim2.new(1, -68, 0.5, -14)
@@ -287,6 +315,8 @@ local function createMainFrame(title)
         end
         
         btn.MouseButton1Click:Connect(toggle)
+        
+        updatePagesCanvas()
         
         return {
             Toggle = toggle,
@@ -407,23 +437,23 @@ local function createMainFrame(title)
             end
         end)
         
+        updatePagesCanvas()
+        
         return {
             SetValue = updateSlider,
             GetValue = function() return value end
         }
     end
     
-    -- === 4) КНОПКА-СПИСОК ===
+    -- === 4) КНОПКА-СПИСОК (с zIndex поверх) ===
     function UIFramework:CreateDropdown(page, label, options, defaultOption, multiSelect)
         multiSelect = multiSelect or false
         
-        -- Контейнер для дропдауна
         local container = Instance.new("Frame")
         container.Size = UDim2.new(1, 0, 0, 44)
         container.BackgroundTransparency = 1
         container.Parent = page
         
-        -- Основная кнопка
         local mainBtn = Instance.new("TextButton")
         mainBtn.Size = UDim2.new(1, -16, 0, 36)
         mainBtn.Position = UDim2.new(0, 8, 0, 4)
@@ -436,12 +466,12 @@ local function createMainFrame(title)
         mainBtn.TextXAlignment = Enum.TextXAlignment.Left
         mainBtn.Font = Enum.Font.GothamSemibold
         mainBtn.Parent = container
+        mainBtn.ZIndex = 2 -- Поверх всего
         
         local mainCorner = Instance.new("UICorner")
         mainCorner.CornerRadius = UDim.new(0, 4)
         mainCorner.Parent = mainBtn
         
-        -- Стрелка справа
         local arrow = Instance.new("TextLabel")
         arrow.Size = UDim2.new(0, 30, 0, 36)
         arrow.Position = UDim2.new(1, -36, 0, 0)
@@ -452,8 +482,9 @@ local function createMainFrame(title)
         arrow.TextXAlignment = Enum.TextXAlignment.Center
         arrow.Font = Enum.Font.GothamBold
         arrow.Parent = mainBtn
+        arrow.ZIndex = 2
         
-        -- Выпадающий список
+        -- Выпадающий список (поверх всего)
         local listFrame = Instance.new("Frame")
         listFrame.Size = UDim2.new(1, -16, 0, 0)
         listFrame.Position = UDim2.new(0, 8, 0, 40)
@@ -462,22 +493,34 @@ local function createMainFrame(title)
         listFrame.BorderSizePixel = 0
         listFrame.Visible = false
         listFrame.Parent = container
+        listFrame.ZIndex = 10 -- Высокий zIndex, чтобы быть поверх всего
         
         local listCorner = Instance.new("UICorner")
         listCorner.CornerRadius = UDim.new(0, 4)
         listCorner.Parent = listFrame
+        
+        local listShadow = Instance.new("Frame")
+        listShadow.Size = UDim2.new(1, 0, 1, 0)
+        listShadow.Position = UDim2.new(0, 4, 0, 4)
+        listShadow.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+        listShadow.BackgroundTransparency = 0.5
+        listShadow.BorderSizePixel = 0
+        listShadow.ZIndex = 9
+        listShadow.Parent = listFrame
+        
+        local listShadowCorner = Instance.new("UICorner")
+        listShadowCorner.CornerRadius = UDim.new(0, 4)
+        listShadowCorner.Parent = listShadow
         
         local listLayout = Instance.new("UIListLayout")
         listLayout.Padding = UDim.new(0, 2)
         listLayout.SortOrder = Enum.SortOrder.LayoutOrder
         listLayout.Parent = listFrame
         
-        -- Локальные переменные
         local selected = defaultOption
         local isOpen = false
         local buttons = {}
         
-        -- Функция обновления текста на кнопке
         local function updateMainText()
             if multiSelect then
                 local count = 0
@@ -496,7 +539,6 @@ local function createMainFrame(title)
             end
         end
         
-        -- Функция обновления размера списка
         local function updateListSize()
             local count = 0
             for _ in pairs(buttons) do
@@ -504,9 +546,9 @@ local function createMainFrame(title)
             end
             listFrame.Size = UDim2.new(1, -16, 0, math.min(count * 30 + 4, 200))
             container.Size = UDim2.new(1, 0, 0, 44 + (isOpen and listFrame.Size.Y.Offset or 0))
+            updatePagesCanvas()
         end
         
-        -- Создаём кнопки для каждого варианта
         for _, option in ipairs(options) do
             local btn = Instance.new("TextButton")
             btn.Size = UDim2.new(1, -8, 0, 28)
@@ -520,12 +562,12 @@ local function createMainFrame(title)
             btn.TextXAlignment = Enum.TextXAlignment.Left
             btn.Font = Enum.Font.GothamSemibold
             btn.Parent = listFrame
+            btn.ZIndex = 10
             
             local btnCorner = Instance.new("UICorner")
             btnCorner.CornerRadius = UDim.new(0, 3)
             btnCorner.Parent = btn
             
-            -- Галочка
             local check = Instance.new("TextLabel")
             check.Size = UDim2.new(0, 20, 1, 0)
             check.Position = UDim2.new(1, -24, 0, 0)
@@ -537,13 +579,13 @@ local function createMainFrame(title)
             check.Font = Enum.Font.GothamBold
             check.Visible = false
             check.Parent = btn
+            check.ZIndex = 10
             
             buttons[option] = {
                 Button = btn,
                 Check = check
             }
             
-            -- Клик по варианту
             btn.MouseButton1Click:Connect(function()
                 if multiSelect then
                     if type(selected) ~= "table" then
@@ -563,7 +605,6 @@ local function createMainFrame(title)
                     btn.TextColor3 = COLORS.Text
                     check.Visible = true
                     updateMainText()
-                    -- Закрываем
                     isOpen = false
                     listFrame.Visible = false
                     arrow.Text = "▼"
@@ -572,7 +613,6 @@ local function createMainFrame(title)
             end)
         end
         
-        -- Выделяем дефолтный вариант
         if not multiSelect then
             for opt, data in pairs(buttons) do
                 if opt == defaultOption then
@@ -589,7 +629,6 @@ local function createMainFrame(title)
             end
         end
         
-        -- Клик по основной кнопке (открыть/закрыть)
         mainBtn.MouseButton1Click:Connect(function()
             isOpen = not isOpen
             listFrame.Visible = isOpen
@@ -599,6 +638,7 @@ local function createMainFrame(title)
         
         updateMainText()
         updateListSize()
+        updatePagesCanvas()
         
         return {
             GetSelected = function()
@@ -651,7 +691,7 @@ local function createMainFrame(title)
     function UIFramework:CreatePage(name)
         local pageFrame = Instance.new("Frame")
         pageFrame.Name = name
-        pageFrame.Size = UDim2.new(1, 0, 1, 0)
+        pageFrame.Size = UDim2.new(1, 0, 0, 0) -- Высота будет меняться
         pageFrame.BackgroundTransparency = 1
         pageFrame.Visible = false
         pageFrame.Parent = pagesContainer
@@ -660,6 +700,24 @@ local function createMainFrame(title)
         pageLayout.Padding = UDim.new(0, 4)
         pageLayout.SortOrder = Enum.SortOrder.LayoutOrder
         pageLayout.Parent = pageFrame
+        
+        -- Обновляем размер страницы при добавлении элементов
+        local function updatePageSize()
+            local totalHeight = 0
+            for _, child in ipairs(pageFrame:GetChildren()) do
+                if child:IsA("Frame") then
+                    totalHeight = totalHeight + child.Size.Y.Offset
+                end
+            end
+            pageFrame.Size = UDim2.new(1, 0, 0, totalHeight + 16)
+            updatePagesCanvas()
+        end
+        
+        -- Отслеживаем изменения размера
+        pageFrame.ChildAdded:Connect(function()
+            task.wait(0.05)
+            updatePageSize()
+        end)
         
         local tabBtn = Instance.new("TextButton")
         tabBtn.Name = name .. "Tab"
@@ -680,6 +738,7 @@ local function createMainFrame(title)
         tabCorner.CornerRadius = UDim.new(0, 4)
         tabCorner.Parent = tabBtn
         
+        -- Обновляем CanvasSize левой панели
         leftScrolling.CanvasSize = UDim2.new(0, 0, 0, leftScrolling.CanvasSize.Y.Offset + 40)
         
         tabBtn.MouseButton1Click:Connect(function()
@@ -689,12 +748,16 @@ local function createMainFrame(title)
         pages[name] = {
             Frame = pageFrame,
             Button = tabBtn,
-            Layout = pageLayout
+            Layout = pageLayout,
+            UpdateSize = updatePageSize
         }
         
         if not activePage then
             UIFramework:SwitchPage(name)
         end
+        
+        task.wait(0.1)
+        updatePageSize()
         
         return pageFrame, pageLayout
     end
@@ -712,6 +775,11 @@ local function createMainFrame(title)
         pages[name].Button.BackgroundColor3 = COLORS.TabActive
         pages[name].Button.TextColor3 = COLORS.Text
         activePage = name
+        
+        -- Обновляем CanvasSize
+        task.wait(0.05)
+        pages[name]:UpdateSize()
+        updatePagesCanvas()
     end
     
     -- Перетаскивание
@@ -755,7 +823,8 @@ local function createMainFrame(title)
         CreateToggleWithBind = UIFramework.CreateToggleWithBind,
         CreateToggle = UIFramework.CreateToggle,
         CreateSlider = UIFramework.CreateSlider,
-        CreateDropdown = UIFramework.CreateDropdown
+        CreateDropdown = UIFramework.CreateDropdown,
+        UpdatePagesCanvas = updatePagesCanvas
     }
 end
 
