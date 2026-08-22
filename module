@@ -107,7 +107,7 @@ local function createMainFrame(title)
     leftMask.BorderSizePixel = 0
     leftMask.Parent = leftPanel
     
-    -- Скроллинг для левой панели (кнопки страниц)
+    -- Скроллинг для левой панели
     local leftScrolling = Instance.new("ScrollingFrame")
     leftScrolling.Size = UDim2.new(1, 0, 1, 0)
     leftScrolling.BackgroundTransparency = 1
@@ -146,7 +146,7 @@ local function createMainFrame(title)
     rightMask.BorderSizePixel = 0
     rightMask.Parent = rightPanel
     
-    -- Контейнер для страниц с ScrollingFrame
+    -- ScrollingFrame для страниц
     local pagesScrolling = Instance.new("ScrollingFrame")
     pagesScrolling.Name = "PagesScrolling"
     pagesScrolling.Size = UDim2.new(1, 0, 1, 0)
@@ -169,49 +169,37 @@ local function createMainFrame(title)
     
     -- Функция обновления CanvasSize
     local function updatePagesCanvas()
-        if not pages or next(pages) == nil then
+        if not pages then
             pagesScrolling.CanvasSize = UDim2.new(0, 0, 0, 16)
             return
         end
         
         local totalHeight = 16
+        local hasVisible = false
         for _, data in pairs(pages) do
-            if data.Frame and data.Frame.Visible then
+            if data and data.Frame and data.Frame.Visible then
+                hasVisible = true
                 totalHeight = totalHeight + data.Frame.Size.Y.Offset + 4
             end
         end
+        
+        if not hasVisible then
+            totalHeight = 16
+        end
+        
         pagesScrolling.CanvasSize = UDim2.new(0, 0, 0, totalHeight)
     end
     
-    -- === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
+    -- === ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ ===
     local function createElementContainer(parent)
         local frame = Instance.new("Frame")
         frame.Size = UDim2.new(1, 0, 0, 44)
         frame.BackgroundTransparency = 1
         frame.Parent = parent
-        
-        -- Обновляем размер страницы при добавлении элементов
-        task.wait(0.05)
-        if parent and parent.Parent then
-            -- Находим страницу
-            local page = parent
-            while page and page.Name ~= "PageFrame" and not page:IsA("ScrollingFrame") do
-                page = page.Parent
-            end
-            if page and page.Parent and pages then
-                for name, data in pairs(pages) do
-                    if data.Frame == page then
-                        updatePagesCanvas()
-                        break
-                    end
-                end
-            end
-        end
-        
         return frame
     end
     
-    -- === 1) КНОПКА С БИНДОМ (выключена по умолчанию) ===
+    -- === 1) КНОПКА С БИНДОМ ===
     function UIFramework:CreateToggleWithBind(page, label, defaultState, bindKey)
         defaultState = defaultState or false
         local container = createElementContainer(page)
@@ -287,7 +275,7 @@ local function createMainFrame(title)
         }
     end
     
-    -- === 2) КНОПКА БЕЗ БИНДА (выключена по умолчанию) ===
+    -- === 2) КНОПКА БЕЗ БИНДА ===
     function UIFramework:CreateToggle(page, label, defaultState)
         defaultState = defaultState or false
         local container = createElementContainer(page)
@@ -471,7 +459,7 @@ local function createMainFrame(title)
         }
     end
     
-    -- === 4) КНОПКА-СПИСОК (с zIndex поверх) ===
+    -- === 4) КНОПКА-СПИСОК ===
     function UIFramework:CreateDropdown(page, label, options, defaultOption, multiSelect)
         multiSelect = multiSelect or false
         
@@ -793,18 +781,28 @@ local function createMainFrame(title)
         if not pages[name] then return end
         
         for _, data in pairs(pages) do
-            data.Frame.Visible = false
-            data.Button.BackgroundColor3 = COLORS.TabInactive
-            data.Button.TextColor3 = COLORS.TextDim
+            if data and data.Frame then
+                data.Frame.Visible = false
+            end
+            if data and data.Button then
+                data.Button.BackgroundColor3 = COLORS.TabInactive
+                data.Button.TextColor3 = COLORS.TextDim
+            end
         end
         
-        pages[name].Frame.Visible = true
-        pages[name].Button.BackgroundColor3 = COLORS.TabActive
-        pages[name].Button.TextColor3 = COLORS.Text
+        if pages[name] and pages[name].Frame then
+            pages[name].Frame.Visible = true
+        end
+        if pages[name] and pages[name].Button then
+            pages[name].Button.BackgroundColor3 = COLORS.TabActive
+            pages[name].Button.TextColor3 = COLORS.Text
+        end
         activePage = name
         
         task.wait(0.05)
-        pages[name]:UpdateSize()
+        if pages[name] and pages[name].UpdateSize then
+            pages[name]:UpdateSize()
+        end
         updatePagesCanvas()
     end
     
@@ -857,3 +855,5 @@ end
 function UIFramework.New(title)
     return createMainFrame(title or "UI Framework")
 end
+
+return UIFramework
