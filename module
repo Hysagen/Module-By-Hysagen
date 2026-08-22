@@ -17,14 +17,20 @@ local function createMainFrame(title)
     screenGui.ResetOnSpawn = false
     screenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
     
-    -- ОСНОВНОЙ КОНТЕЙНЕР (прозрачный, только для позиционирования)
+    -- ОСНОВНОЙ ФРЕЙМ
     local mainFrame = Instance.new("Frame")
     mainFrame.Name = "MainFrame"
     mainFrame.Size = UDim2.new(0, 600, 0, 400)
     mainFrame.Position = UDim2.new(0.5, -300, 0.5, -200)
-    mainFrame.BackgroundTransparency = 1
+    mainFrame.BackgroundColor3 = COLORS.Background
+    mainFrame.BackgroundTransparency = 0
     mainFrame.BorderSizePixel = 0
     mainFrame.Parent = screenGui
+    
+    -- Скругление всех углов
+    local mainCorner = Instance.new("UICorner")
+    mainCorner.CornerRadius = UDim.new(0, 8)
+    mainCorner.Parent = mainFrame
     
     -- ТЕНЬ
     local shadow = Instance.new("Frame")
@@ -40,19 +46,6 @@ local function createMainFrame(title)
     shadowCorner.CornerRadius = UDim.new(0, 8)
     shadowCorner.Parent = shadow
     
-    -- ФОН (именно здесь скругление)
-    local background = Instance.new("Frame")
-    background.Name = "Background"
-    background.Size = UDim2.new(1, 0, 1, 0)
-    background.BackgroundColor3 = COLORS.Background
-    background.BackgroundTransparency = 0
-    background.BorderSizePixel = 0
-    background.Parent = mainFrame
-    
-    local bgCorner = Instance.new("UICorner")
-    bgCorner.CornerRadius = UDim.new(0, 8)
-    bgCorner.Parent = background
-    
     -- ВЕРХНЯЯ ПАНЕЛЬ
     local topBar = Instance.new("Frame")
     topBar.Name = "TopBar"
@@ -60,14 +53,14 @@ local function createMainFrame(title)
     topBar.BackgroundColor3 = COLORS.TopBar
     topBar.BackgroundTransparency = 0
     topBar.BorderSizePixel = 0
-    topBar.Parent = background
+    topBar.Parent = mainFrame
     
     -- Скругление верхней панели (только верх)
     local topCorner = Instance.new("UICorner")
     topCorner.CornerRadius = UDim.new(0, 8)
     topCorner.Parent = topBar
     
-    -- Маскируем нижнюю часть topBar (чтобы не перекрывала скругление фона)
+    -- Маскируем нижнюю часть topBar
     local topMask = Instance.new("Frame")
     topMask.Size = UDim2.new(1, 0, 0, 8)
     topMask.Position = UDim2.new(0, 0, 1, -8)
@@ -108,7 +101,7 @@ local function createMainFrame(title)
     container.Size = UDim2.new(1, 0, 1, -36)
     container.Position = UDim2.new(0, 0, 0, 36)
     container.BackgroundTransparency = 1
-    container.Parent = background
+    container.Parent = mainFrame
     
     -- ЛЕВАЯ ПАНЕЛЬ
     local leftPanel = Instance.new("Frame")
@@ -133,7 +126,14 @@ local function createMainFrame(title)
     leftMask.BorderSizePixel = 0
     leftMask.Parent = leftPanel
     
-    -- Скроллинг для левой панели
+    -- КОНТЕЙНЕР ДЛЯ КНОПОК (с вертикальным центрированием)
+    local buttonContainer = Instance.new("Frame")
+    buttonContainer.Name = "ButtonContainer"
+    buttonContainer.Size = UDim2.new(1, 0, 1, 0)
+    buttonContainer.BackgroundTransparency = 1
+    buttonContainer.Parent = leftPanel
+    
+    -- Скроллинг для кнопок
     local leftScrolling = Instance.new("ScrollingFrame")
     leftScrolling.Size = UDim2.new(1, 0, 1, 0)
     leftScrolling.BackgroundTransparency = 1
@@ -141,11 +141,14 @@ local function createMainFrame(title)
     leftScrolling.ScrollBarThickness = 4
     leftScrolling.ScrollBarImageColor3 = COLORS.Accent
     leftScrolling.CanvasSize = UDim2.new(0, 0, 0, 0)
-    leftScrolling.Parent = leftPanel
+    leftScrolling.Parent = buttonContainer
     
+    -- UIListLayout для вертикального центрирования
     local leftLayout = Instance.new("UIListLayout")
     leftLayout.Padding = UDim.new(0, 4)
     leftLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    leftLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    leftLayout.VerticalAlignment = Enum.VerticalAlignment.Center
     leftLayout.Parent = leftScrolling
     
     -- ПРАВАЯ ПАНЕЛЬ
@@ -172,7 +175,7 @@ local function createMainFrame(title)
     rightMask.BorderSizePixel = 0
     rightMask.Parent = rightPanel
     
-    -- КОНТЕЙНЕР ДЛЯ СТРАНИЦ (с отступами)
+    -- КОНТЕЙНЕР ДЛЯ СТРАНИЦ
     local pagesContainer = Instance.new("Frame")
     pagesContainer.Name = "PagesContainer"
     pagesContainer.Size = UDim2.new(1, -16, 1, -16)
@@ -180,7 +183,6 @@ local function createMainFrame(title)
     pagesContainer.BackgroundTransparency = 1
     pagesContainer.Parent = rightPanel
     
-    -- Словарь для хранения страниц
     local pages = {}
     local activePage = nil
     
@@ -199,31 +201,27 @@ local function createMainFrame(title)
         pageLayout.SortOrder = Enum.SortOrder.LayoutOrder
         pageLayout.Parent = pageFrame
         
-        -- Кнопка в левой панели
+        -- Кнопка в левой панели (центрированная)
         local tabBtn = Instance.new("TextButton")
         tabBtn.Name = name .. "Tab"
-        tabBtn.Size = UDim2.new(1, -16, 0, 36)
-        tabBtn.Position = UDim2.new(0, 8, 0, 0)
+        tabBtn.Size = UDim2.new(0, 140, 0, 36)  -- Фиксированная ширина
         tabBtn.BackgroundColor3 = COLORS.TabInactive
         tabBtn.BackgroundTransparency = 0
         tabBtn.BorderSizePixel = 0
         tabBtn.Text = name
         tabBtn.TextColor3 = COLORS.TextDim
         tabBtn.TextSize = 14
-        tabBtn.TextXAlignment = Enum.TextXAlignment.Left
+        tabBtn.TextXAlignment = Enum.TextXAlignment.Center  -- Текст по центру
+        tabBtn.TextYAlignment = Enum.TextYAlignment.Center  -- Текст по центру
         tabBtn.TextTruncate = Enum.TextTruncate.AtEnd
         tabBtn.Font = Enum.Font.GothamSemibold
         tabBtn.Parent = leftScrolling
-        
-        -- Отступ для текста через UIPadding
-        local textPad = Instance.new("UIPadding")
-        textPad.PaddingLeft = UDim.new(0, 12)
-        textPad.Parent = tabBtn
         
         local tabCorner = Instance.new("UICorner")
         tabCorner.CornerRadius = UDim.new(0, 4)
         tabCorner.Parent = tabBtn
         
+        -- Обновляем CanvasSize
         leftScrolling.CanvasSize = UDim2.new(0, 0, 0, leftScrolling.CanvasSize.Y.Offset + 40)
         
         tabBtn.MouseButton1Click:Connect(function()
