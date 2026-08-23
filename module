@@ -137,18 +137,14 @@ local function createMainFrame(title)
     container.BackgroundTransparency = 1
     container.Parent = mainFrame
     
-    -- Переменные для левой панели
+    -- Переменные для панелей
     local leftPanel = nil
     local leftScrolling = nil
-    local leftLayout = nil
     local rightPanel = nil
     local pagesScrolling = nil
     local pagesContainer = nil
-    
-    -- Переменные для верхней панели (режим 1:2)
     local topTabsPanel = nil
     local topTabsScrolling = nil
-    local topTabsLayout = nil
     local bottomContent = nil
     local bottomScrolling = nil
     local bottomContainer = nil
@@ -156,6 +152,7 @@ local function createMainFrame(title)
     local pages = {}
     local activePage = nil
     local toggleKey = savedToggleKey
+    local uiRef = nil
     
     -- Функция обновления CanvasSize для страниц
     local function updatePagesCanvas()
@@ -187,17 +184,23 @@ local function createMainFrame(title)
         end
     end
     
-    -- Функция создания интерфейса в зависимости от масштаба
+    -- Функция создания интерфейса
     local function buildInterface()
         -- Очищаем контейнер
         for _, child in ipairs(container:GetChildren()) do
             child:Destroy()
         end
         
+        -- Сохраняем страницы
+        local pagesCopy = {}
+        for name, data in pairs(pages) do
+            pagesCopy[name] = data
+        end
+        pages = {}
+        
         if currentScale.tabsLeft then
-            -- === РЕЖИМ 3:4 И 1:1 (кнопки слева) ===
+            -- === РЕЖИМ С КНОПКАМИ СЛЕВА ===
             
-            -- Левая панель
             leftPanel = Instance.new("Frame")
             leftPanel.Name = "LeftPanel"
             leftPanel.Size = UDim2.new(0, 180, 1, 0)
@@ -227,14 +230,13 @@ local function createMainFrame(title)
             leftScrolling.CanvasSize = UDim2.new(0, 0, 0, 0)
             leftScrolling.Parent = leftPanel
             
-            leftLayout = Instance.new("UIListLayout")
+            local leftLayout = Instance.new("UIListLayout")
             leftLayout.Padding = UDim.new(0, 4)
             leftLayout.SortOrder = Enum.SortOrder.LayoutOrder
             leftLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
             leftLayout.VerticalAlignment = Enum.VerticalAlignment.Top
             leftLayout.Parent = leftScrolling
             
-            -- Правая панель
             rightPanel = Instance.new("Frame")
             rightPanel.Name = "RightPanel"
             rightPanel.Size = UDim2.new(1, -180, 1, 0)
@@ -273,10 +275,33 @@ local function createMainFrame(title)
             pagesContainer.BackgroundTransparency = 1
             pagesContainer.Parent = pagesScrolling
             
-        else
-            -- === РЕЖИМ 1:2 (кнопки сверху) ===
+            -- Восстанавливаем страницы
+            for name, data in pairs(pagesCopy) do
+                if data and data.Frame then
+                    data.Frame.Parent = pagesContainer
+                    data.Frame.Visible = false
+                end
+                if data and data.Button then
+                    data.Button.Parent = leftScrolling
+                    data.Button.Size = UDim2.new(0, 140, 0, 36)
+                    data.Button.BackgroundColor3 = COLORS.TabInactive
+                    data.Button.TextColor3 = COLORS.TextDim
+                end
+                pages[name] = data
+            end
             
-            -- Верхняя панель с вкладками
+            -- Обновляем CanvasSize левой панели
+            local totalHeight = 0
+            for _, data in pairs(pages) do
+                if data and data.Button then
+                    totalHeight = totalHeight + 40
+                end
+            end
+            leftScrolling.CanvasSize = UDim2.new(0, 0, 0, totalHeight)
+            
+        else
+            -- === РЕЖИМ С КНОПКАМИ СВЕРХУ ===
+            
             topTabsPanel = Instance.new("Frame")
             topTabsPanel.Name = "TopTabsPanel"
             topTabsPanel.Size = UDim2.new(1, 0, 0, 50)
@@ -289,7 +314,6 @@ local function createMainFrame(title)
             topTabsCorner.CornerRadius = UDim.new(0, 8)
             topTabsCorner.Parent = topTabsPanel
             
-            -- Горизонтальный скроллинг для вкладок
             topTabsScrolling = Instance.new("ScrollingFrame")
             topTabsScrolling.Size = UDim2.new(1, 0, 1, 0)
             topTabsScrolling.BackgroundTransparency = 1
@@ -300,7 +324,7 @@ local function createMainFrame(title)
             topTabsScrolling.Parent = topTabsPanel
             topTabsScrolling.ScrollingDirection = Enum.ScrollingDirection.X
             
-            topTabsLayout = Instance.new("UIListLayout")
+            local topTabsLayout = Instance.new("UIListLayout")
             topTabsLayout.Padding = UDim.new(0, 4)
             topTabsLayout.SortOrder = Enum.SortOrder.LayoutOrder
             topTabsLayout.FillDirection = Enum.FillDirection.Horizontal
@@ -308,7 +332,6 @@ local function createMainFrame(title)
             topTabsLayout.VerticalAlignment = Enum.VerticalAlignment.Center
             topTabsLayout.Parent = topTabsScrolling
             
-            -- Контент снизу
             bottomContent = Instance.new("Frame")
             bottomContent.Name = "BottomContent"
             bottomContent.Size = UDim2.new(1, 0, 1, -50)
@@ -338,28 +361,33 @@ local function createMainFrame(title)
             bottomContainer.Position = UDim2.new(0, 8, 0, 0)
             bottomContainer.BackgroundTransparency = 1
             bottomContainer.Parent = bottomScrolling
+            
+            -- Восстанавливаем страницы
+            for name, data in pairs(pagesCopy) do
+                if data and data.Frame then
+                    data.Frame.Parent = bottomContainer
+                    data.Frame.Visible = false
+                end
+                if data and data.Button then
+                    data.Button.Parent = topTabsScrolling
+                    data.Button.Size = UDim2.new(0, 140, 0, 36)
+                    data.Button.BackgroundColor3 = COLORS.TabInactive
+                    data.Button.TextColor3 = COLORS.TextDim
+                end
+                pages[name] = data
+            end
+            
+            -- Обновляем CanvasSize верхней панели
+            local totalWidth = 0
+            for _, data in pairs(pages) do
+                if data and data.Button then
+                    totalWidth = totalWidth + 144
+                end
+            end
+            topTabsScrolling.CanvasSize = UDim2.new(0, totalWidth, 0, 0)
         end
         
-        -- Пересоздаём страницы если они уже были
-        local pagesCopy = {}
-        for name, data in pairs(pages) do
-            pagesCopy[name] = data
-        end
-        pages = {}
-        for name, data in pairs(pagesCopy) do
-            if data and data.Frame then
-                data.Frame.Parent = currentScale.tabsLeft and pagesContainer or bottomContainer
-                data.Frame.Visible = false
-            end
-            if data and data.Button then
-                data.Button.Parent = currentScale.tabsLeft and leftScrolling or topTabsScrolling
-                data.Button.BackgroundColor3 = COLORS.TabInactive
-                data.Button.TextColor3 = COLORS.TextDim
-            end
-            pages[name] = data
-        end
-        
-        -- Активируем первую страницу если есть
+        -- Активируем первую страницу
         if activePage and pages[activePage] then
             if pages[activePage].Frame then
                 pages[activePage].Frame.Visible = true
@@ -380,25 +408,6 @@ local function createMainFrame(title)
                     break
                 end
             end
-        end
-        
-        -- Обновляем CanvasSize для вкладок
-        if currentScale.tabsLeft then
-            local totalHeight = 0
-            for _, data in pairs(pages) do
-                if data and data.Button then
-                    totalHeight = totalHeight + 40
-                end
-            end
-            leftScrolling.CanvasSize = UDim2.new(0, 0, 0, totalHeight)
-        else
-            local totalWidth = 0
-            for _, data in pairs(pages) do
-                if data and data.Button then
-                    totalWidth = totalWidth + 144
-                end
-            end
-            topTabsScrolling.CanvasSize = UDim2.new(0, totalWidth, 0, 0)
         end
         
         updatePagesCanvas()
@@ -978,12 +987,7 @@ local function createMainFrame(title)
         pageFrame.Size = UDim2.new(1, 0, 0, 0)
         pageFrame.BackgroundTransparency = 1
         pageFrame.Visible = false
-        
-        if currentScale.tabsLeft then
-            pageFrame.Parent = pagesContainer
-        else
-            pageFrame.Parent = bottomContainer
-        end
+        pageFrame.Parent = currentScale.tabsLeft and pagesContainer or bottomContainer
         
         local pageLayout = Instance.new("UIListLayout")
         pageLayout.Padding = UDim.new(0, 4)
@@ -1009,11 +1013,7 @@ local function createMainFrame(title)
         -- Кнопка вкладки
         local tabBtn = Instance.new("TextButton")
         tabBtn.Name = name .. "Tab"
-        if currentScale.tabsLeft then
-            tabBtn.Size = UDim2.new(0, 140, 0, 36)
-        else
-            tabBtn.Size = UDim2.new(0, 140, 0, 36)
-        end
+        tabBtn.Size = UDim2.new(0, 140, 0, 36)
         tabBtn.BackgroundColor3 = COLORS.TabInactive
         tabBtn.BackgroundTransparency = 0
         tabBtn.BorderSizePixel = 0
@@ -1091,28 +1091,45 @@ local function createMainFrame(title)
     end
     
     -- === НАСТРОЙКИ ===
-    -- Создаём страницу настроек
     local settingsPage, settingsLayout = UIFramework:CreatePage("Настройки")
     
     -- Выбор масштаба
     local scaleDropdown = UIFramework:CreateDropdown(settingsPage, "Масштаб", {"3:4", "1:1", "1:2"}, currentScale.name, false)
     
-    -- Функция перезагрузки GUI
-    local function reloadGUI(newScaleName)
-        -- Сохраняем настройки
+    -- Функция смены масштаба
+    local function changeScale(newScaleName)
+        if newScaleName == currentScale.name then return end
+        
+        -- Находим новый масштаб
+        local newScale = nil
+        for _, s in ipairs(SCALES) do
+            if s.name == newScaleName then
+                newScale = s
+                break
+            end
+        end
+        if not newScale then return end
+        
+        -- Меняем текущий масштаб
+        currentScale = newScale
+        
+        -- Меняем размер окна
+        mainFrame.Size = UDim2.new(0, newScale.width, 0, newScale.height)
+        mainFrame.Position = UDim2.new(0.5, -newScale.width/2, 0.5, -newScale.height/2)
+        
+        -- Перестраиваем интерфейс
+        buildInterface()
+        
+        -- Пересоздаём страницу настроек с новыми значениями
+        -- Просто обновляем дропдаун
+        for _, data in pairs(pages) do
+            if data and data.Frame and data.Frame.Parent then
+                -- Обновляем все страницы
+            end
+        end
+        
+        -- Сохраняем
         saveSettings({scale = newScaleName, toggleKey = toggleKey})
-        
-        -- Удаляем всё
-        for _, child in ipairs(screenGui:GetChildren()) do
-            child:Destroy()
-        end
-        
-        -- Создаём заново
-        local newUI = createMainFrame(title)
-        -- Копируем все методы в текущий объект
-        for k, v in pairs(newUI) do
-            uiRef[k] = v
-        end
     end
     
     -- Отслеживаем изменение масштаба
@@ -1121,7 +1138,7 @@ local function createMainFrame(title)
         oldSetSelected(self, newValue)
         local newScale = scaleDropdown:GetSelected()
         if newScale ~= currentScale.name then
-            reloadGUI(newScale)
+            changeScale(newScale)
         end
     end
     
@@ -1177,8 +1194,7 @@ local function createMainFrame(title)
         end
     end)
     
-    -- Сохраняем ссылку на себя
-    local uiRef = {
+    uiRef = {
         MainFrame = mainFrame,
         TopBar = topBar,
         Container = container,
