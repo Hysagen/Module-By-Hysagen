@@ -245,6 +245,71 @@ local function createMainFrame(title)
         return frame
     end
 
+    function UIFramework:CreateToggleWithBind(page, label, defaultState, bindKey, callback)
+        defaultState = defaultState or false
+        local container = createElementContainer(page)
+
+        local toggleFrame = Instance.new("Frame")
+        toggleFrame.Size = UDim2.new(1, -16, 0, 36)
+        toggleFrame.Position = UDim2.new(0, 8, 0, 4)
+        toggleFrame.BackgroundColor3 = COLORS.TabInactive
+        toggleFrame.Parent = container
+        local corner = Instance.new("UICorner"); corner.CornerRadius = UDim.new(0, 4); corner.Parent = toggleFrame
+
+        local labelText = Instance.new("TextLabel")
+        labelText.Size = UDim2.new(0.6, 0, 1, 0)
+        labelText.Position = UDim2.new(0, 8, 0, 0)
+        labelText.BackgroundTransparency = 1
+        labelText.Text = label .. " [" .. string.upper(bindKey) .. "]"
+        labelText.TextColor3 = COLORS.Text
+        labelText.TextSize = 14
+        labelText.TextXAlignment = Enum.TextXAlignment.Left
+        labelText.Font = Enum.Font.GothamSemibold
+        labelText.Parent = toggleFrame
+
+        local state = defaultState
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(0, 60, 0, 28)
+        btn.Position = UDim2.new(1, -68, 0.5, -14)
+        btn.BackgroundColor3 = state and COLORS.Green or COLORS.Red
+        btn.BorderSizePixel = 0
+        btn.Text = state and "ON" or "OFF"
+        btn.TextColor3 = COLORS.Text
+        btn.TextSize = 12
+        btn.Font = Enum.Font.GothamBold
+        btn.Parent = toggleFrame
+        local btnCorner = Instance.new("UICorner"); btnCorner.CornerRadius = UDim.new(0, 4); btnCorner.Parent = btn
+
+        local function toggle()
+            state = not state
+            btn.BackgroundColor3 = state and COLORS.Green or COLORS.Red
+            btn.Text = state and "ON" or "OFF"
+            if callback then callback(state) end
+        end
+
+        btn.MouseButton1Click:Connect(toggle)
+
+        local connection
+        connection = game:GetService("UserInputService").InputBegan:Connect(function(input, gameProcessed)
+            if gameProcessed then return end
+            if input.KeyCode == Enum.KeyCode[bindKey] then toggle() end
+        end)
+
+        task.wait(0.05); updatePagesCanvas()
+
+        return {
+            Toggle = toggle,
+            SetState = function(newState)
+                state = newState
+                btn.BackgroundColor3 = state and COLORS.Green or COLORS.Red
+                btn.Text = state and "ON" or "OFF"
+                if callback then callback(state) end
+            end,
+            GetState = function() return state end,
+            Connection = connection
+        }
+    end
+
     function UIFramework:CreateToggle(page, label, defaultState, callback)
         defaultState = defaultState or false
         local container = createElementContainer(page)
@@ -299,6 +364,124 @@ local function createMainFrame(title)
                 if callback then callback(state) end
             end,
             GetState = function() return state end
+        }
+    end
+
+    function UIFramework:CreateSlider(page, label, min, max, default, callback)
+        local container = createElementContainer(page)
+        container.Size = UDim2.new(1, 0, 0, 54)
+
+        local sliderFrame = Instance.new("Frame")
+        sliderFrame.Size = UDim2.new(1, -16, 0, 46)
+        sliderFrame.Position = UDim2.new(0, 8, 0, 4)
+        sliderFrame.BackgroundColor3 = COLORS.TabInactive
+        sliderFrame.Parent = container
+        local corner = Instance.new("UICorner"); corner.CornerRadius = UDim.new(0, 4); corner.Parent = sliderFrame
+
+        local labelText = Instance.new("TextLabel")
+        labelText.Size = UDim2.new(0.5, 0, 0, 20)
+        labelText.Position = UDim2.new(0, 8, 0, 2)
+        labelText.BackgroundTransparency = 1
+        labelText.Text = label
+        labelText.TextColor3 = COLORS.Text
+        labelText.TextSize = 13
+        labelText.TextXAlignment = Enum.TextXAlignment.Left
+        labelText.Font = Enum.Font.GothamSemibold
+        labelText.Parent = sliderFrame
+
+        local valueLabel = Instance.new("TextLabel")
+        valueLabel.Size = UDim2.new(0.3, 0, 0, 20)
+        valueLabel.Position = UDim2.new(0.7, 0, 0, 2)
+        valueLabel.BackgroundTransparency = 1
+        valueLabel.Text = tostring(default or min)
+        valueLabel.TextColor3 = COLORS.Accent
+        valueLabel.TextSize = 13
+        valueLabel.TextXAlignment = Enum.TextXAlignment.Right
+        valueLabel.Font = Enum.Font.GothamBold
+        valueLabel.Parent = sliderFrame
+
+        local slider = Instance.new("Frame")
+        slider.Size = UDim2.new(0.9, 0, 0, 4)
+        slider.Position = UDim2.new(0.05, 0, 1, -10)
+        slider.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
+        slider.Parent = sliderFrame
+        local sliderCorner = Instance.new("UICorner"); sliderCorner.CornerRadius = UDim.new(0, 2); sliderCorner.Parent = slider
+
+        local fill = Instance.new("Frame")
+        fill.Size = UDim2.new(0.5, 0, 1, 0)
+        fill.BackgroundColor3 = COLORS.Accent
+        fill.Parent = slider
+        local fillCorner = Instance.new("UICorner"); fillCorner.CornerRadius = UDim.new(0, 2); fillCorner.Parent = fill
+
+        local handle = Instance.new("Frame")
+        handle.Size = UDim2.new(0, 16, 0, 16)
+        handle.Position = UDim2.new(0.5, -8, 0.5, -8)
+        handle.BackgroundColor3 = COLORS.Accent
+        handle.Parent = fill
+        local handleCorner = Instance.new("UICorner"); handleCorner.CornerRadius = UDim.new(1, 0); handleCorner.Parent = handle
+
+        local handleBorder = Instance.new("Frame")
+        handleBorder.Size = UDim2.new(1, 0, 1, 0)
+        handleBorder.BackgroundColor3 = COLORS.Text
+        handleBorder.Parent = handle
+        local handleBorderCorner = Instance.new("UICorner"); handleBorderCorner.CornerRadius = UDim.new(1, 0); handleBorderCorner.Parent = handleBorder
+
+        if type(default) == "table" then default = min end
+        default = default or min
+
+        local value = math.round(default)
+        local function updateSlider(newValue)
+            if type(newValue) == "table" then newValue = min end
+            value = math.round(math.clamp(newValue, min, max))
+            local percentage = (value - min) / (max - min)
+            fill.Size = UDim2.new(percentage, 0, 1, 0)
+            valueLabel.Text = tostring(value)
+            if callback then callback(value) end
+        end
+
+        updateSlider(value)
+
+        local dragging = false
+        local function startDrag(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                dragging = true
+                local mousePos = input.Position.X
+                local sliderPos = slider.AbsolutePosition.X
+                local sliderWidth = slider.AbsoluteSize.X
+                local percentage = math.clamp((mousePos - sliderPos) / sliderWidth, 0, 1)
+                updateSlider(min + (max - min) * percentage)
+            end
+        end
+
+        local function moveDrag(input)
+            if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+                local mousePos = input.Position.X
+                local sliderPos = slider.AbsolutePosition.X
+                local sliderWidth = slider.AbsoluteSize.X
+                local percentage = math.clamp((mousePos - sliderPos) / sliderWidth, 0, 1)
+                updateSlider(min + (max - min) * percentage)
+            end
+        end
+
+        local function endDrag(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+        end
+
+        slider.InputBegan:Connect(startDrag)
+        slider.InputEnded:Connect(endDrag)
+        handle.InputBegan:Connect(startDrag)
+        handle.InputEnded:Connect(endDrag)
+        handleBorder.InputBegan:Connect(startDrag)
+        handleBorder.InputEnded:Connect(endDrag)
+
+        game:GetService("UserInputService").InputChanged:Connect(moveDrag)
+        game:GetService("UserInputService").InputEnded:Connect(endDrag)
+
+        task.wait(0.05); updatePagesCanvas()
+
+        return {
+            SetValue = updateSlider,
+            GetValue = function() return value end
         }
     end
 
@@ -501,12 +684,33 @@ local function createMainFrame(title)
         task.wait(0.05); if pages[name] and pages[name].UpdateSize then pages[name]:UpdateSize() end
         updatePagesCanvas()
     end
+    local settingsPage, settingsLayout = UIFramework:CreatePage("Настройки")
+
+    local scaleDropdown = UIFramework:CreateDropdown(settingsPage, "Масштаб", {"3:4", "1:1", "1:2"}, currentScale.name, false, function(newScaleName)
+        if newScaleName == currentScale.name then return end
+        local newScale = nil
+        for _, s in ipairs(SCALES) do if s.name == newScaleName then newScale = s; break end end
+        if not newScale then return end
+
+        currentScale = newScale
+        mainFrame.Size = UDim2.new(0, newScale.width, 0, newScale.height)
+        mainFrame.Position = UDim2.new(0.5, -newScale.width/2, 0.5, -newScale.height/2)
+        buildInterface()
+        saveSettings({scale = newScaleName, toggleKey = toggleKey})
+    end)
+
+    local keyOptions = {"RightControl", "LeftControl", "RightShift", "LeftShift", "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12"}
+    local keyDropdown = UIFramework:CreateDropdown(settingsPage, "Клавиша открытия", keyOptions, toggleKey, false, function(newKey)
+        if newKey and newKey ~= toggleKey then
+            toggleKey = newKey
+            saveSettings({scale = currentScale.name, toggleKey = toggleKey})
+        end
+    end)
 
     game:GetService("UserInputService").InputBegan:Connect(function(input, gameProcessed)
         if gameProcessed then return end
         if input.KeyCode == Enum.KeyCode[toggleKey] then mainFrame.Visible = not mainFrame.Visible end
     end)
-
     local dragging, dragStart, startPos
     topBar.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = true; dragStart = input.Position; startPos = mainFrame.Position end
@@ -524,6 +728,8 @@ local function createMainFrame(title)
         CreatePage = UIFramework.CreatePage,
         SwitchPage = UIFramework.SwitchPage,
         CreateToggle = UIFramework.CreateToggle,
+        CreateToggleWithBind = UIFramework.CreateToggleWithBind,
+        CreateSlider = UIFramework.CreateSlider,
         CreateDropdown = UIFramework.CreateDropdown
     }
 end
