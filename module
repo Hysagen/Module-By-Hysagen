@@ -1,4 +1,3 @@
--- Название модуля: UIFramework
 local UIFramework = {}
 
 local COLORS = {
@@ -14,36 +13,23 @@ local COLORS = {
     Green = Color3.fromRGB(70, 255, 70),
 }
 
--- Режимы масштабирования
 local SCALES = {
     {name = "3:4", width = 600, height = 400, tabsLeft = true},
     {name = "1:1", width = 500, height = 500, tabsLeft = true},
     {name = "1:2", width = 700, height = 350, tabsLeft = false},
 }
 
--- Функции для сохранения/загрузки
 local function saveSettings(settings)
     if not writefile then return end
-    local success, err = pcall(function()
-        writefile("UIFramework_Settings.json", game:GetService("HttpService"):JSONEncode(settings))
-    end)
-    if not success then
-        warn("Failed to save settings: " .. tostring(err))
-    end
+    pcall(function() writefile("UIFramework_Settings.json", game:GetService("HttpService"):JSONEncode(settings)) end)
 end
 
 local function loadSettings()
     if not readfile then return nil end
-    local success, data = pcall(function()
-        return readfile("UIFramework_Settings.json")
-    end)
+    local success, data = pcall(function() return readfile("UIFramework_Settings.json") end)
     if success and data then
-        local success2, decoded = pcall(function()
-            return game:GetService("HttpService"):JSONDecode(data)
-        end)
-        if success2 then
-            return decoded
-        end
+        local success2, decoded = pcall(function() return game:GetService("HttpService"):JSONDecode(data) end)
+        if success2 then return decoded end
     end
     return nil
 end
@@ -52,59 +38,39 @@ local function createMainFrame(title)
     local screenGui = Instance.new("ScreenGui")
     screenGui.Name = "UIFramework"
     screenGui.ResetOnSpawn = false
-    screenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
-    
-    -- Загружаем сохранённые настройки
+    screenGui.Parent = game:GetService("CoreGui")
+
     local settings = loadSettings()
     local savedScale = settings and settings.scale or "3:4"
     local savedToggleKey = settings and settings.toggleKey or "RightControl"
-    
+
     local currentScale = nil
-    for _, s in ipairs(SCALES) do
-        if s.name == savedScale then
-            currentScale = s
-            break
-        end
-    end
-    if not currentScale then
-        currentScale = SCALES[1]
-    end
-    
+    for _, s in ipairs(SCALES) do if s.name == savedScale then currentScale = s; break end end
+    if not currentScale then currentScale = SCALES[1] end
+
     local mainFrame = Instance.new("Frame")
     mainFrame.Name = "MainFrame"
     mainFrame.Size = UDim2.new(0, currentScale.width, 0, currentScale.height)
     mainFrame.Position = UDim2.new(0.5, -currentScale.width/2, 0.5, -currentScale.height/2)
     mainFrame.BackgroundColor3 = COLORS.Background
-    mainFrame.BackgroundTransparency = 0
     mainFrame.BorderSizePixel = 0
     mainFrame.Parent = screenGui
-    mainFrame.Visible = true
-    
+
     local mainCorner = Instance.new("UICorner")
     mainCorner.CornerRadius = UDim.new(0, 8)
     mainCorner.Parent = mainFrame
-    
-    -- Верхняя панель
+
     local topBar = Instance.new("Frame")
     topBar.Name = "TopBar"
     topBar.Size = UDim2.new(1, 0, 0, 36)
     topBar.BackgroundColor3 = COLORS.TopBar
-    topBar.BackgroundTransparency = 0
     topBar.BorderSizePixel = 0
     topBar.Parent = mainFrame
-    
+
     local topCorner = Instance.new("UICorner")
     topCorner.CornerRadius = UDim.new(0, 8)
     topCorner.Parent = topBar
-    
-    local topMask = Instance.new("Frame")
-    topMask.Size = UDim2.new(1, 0, 0, 8)
-    topMask.Position = UDim2.new(0, 0, 1, -8)
-    topMask.BackgroundColor3 = topBar.BackgroundColor3
-    topMask.BackgroundTransparency = 0
-    topMask.BorderSizePixel = 0
-    topMask.Parent = topBar
-    
+
     local titleLabel = Instance.new("TextLabel")
     titleLabel.Size = UDim2.new(1, -50, 1, 0)
     titleLabel.Position = UDim2.new(0, 12, 0, 0)
@@ -115,7 +81,7 @@ local function createMainFrame(title)
     titleLabel.TextXAlignment = Enum.TextXAlignment.Left
     titleLabel.Font = Enum.Font.GothamBold
     titleLabel.Parent = topBar
-    
+
     local closeBtn = Instance.new("TextButton")
     closeBtn.Size = UDim2.new(0, 30, 0, 30)
     closeBtn.Position = UDim2.new(1, -36, 0, 3)
@@ -125,101 +91,55 @@ local function createMainFrame(title)
     closeBtn.TextSize = 18
     closeBtn.Font = Enum.Font.GothamBold
     closeBtn.Parent = topBar
-    closeBtn.MouseButton1Click:Connect(function()
-        mainFrame.Visible = false
-    end)
-    
-    -- Контейнер
+    closeBtn.MouseButton1Click:Connect(function() mainFrame.Visible = false end)
+
     local container = Instance.new("Frame")
     container.Name = "Container"
     container.Size = UDim2.new(1, 0, 1, -36)
     container.Position = UDim2.new(0, 0, 0, 36)
     container.BackgroundTransparency = 1
     container.Parent = mainFrame
-    
-    -- Переменные для панелей
-    local leftPanel = nil
-    local leftScrolling = nil
-    local rightPanel = nil
-    local pagesScrolling = nil
-    local pagesContainer = nil
-    local topTabsPanel = nil
-    local topTabsScrolling = nil
-    local bottomContent = nil
-    local bottomScrolling = nil
-    local bottomContainer = nil
-    
+
+    local leftPanel, leftScrolling, rightPanel, pagesScrolling, pagesContainer
+    local topTabsPanel, topTabsScrolling, bottomContent, bottomScrolling, bottomContainer
+
     local pages = {}
     local activePage = nil
     local toggleKey = savedToggleKey
     local uiRef = nil
-    
-    -- Функция обновления CanvasSize для страниц
+
     local function updatePagesCanvas()
         if not pages then
-            if pagesScrolling then
-                pagesScrolling.CanvasSize = UDim2.new(0, 0, 0, 16)
-            end
-            if bottomScrolling then
-                bottomScrolling.CanvasSize = UDim2.new(0, 0, 0, 16)
-            end
+            if pagesScrolling then pagesScrolling.CanvasSize = UDim2.new(0, 0, 0, 16) end
+            if bottomScrolling then bottomScrolling.CanvasSize = UDim2.new(0, 0, 0, 16) end
             return
         end
-        
         local totalHeight = 16
         for _, data in pairs(pages) do
             if data and data.Frame and data.Frame.Visible then
                 totalHeight = totalHeight + data.Frame.Size.Y.Offset + 4
             end
         end
-        
         if currentScale.tabsLeft then
-            if pagesScrolling then
-                pagesScrolling.CanvasSize = UDim2.new(0, 0, 0, totalHeight)
-            end
+            if pagesScrolling then pagesScrolling.CanvasSize = UDim2.new(0, 0, 0, totalHeight) end
         else
-            if bottomScrolling then
-                bottomScrolling.CanvasSize = UDim2.new(0, 0, 0, totalHeight)
-            end
+            if bottomScrolling then bottomScrolling.CanvasSize = UDim2.new(0, 0, 0, totalHeight) end
         end
     end
-    
-    -- Функция создания интерфейса
+
     local function buildInterface()
-        -- Очищаем контейнер
-        for _, child in ipairs(container:GetChildren()) do
-            child:Destroy()
-        end
-        
-        -- Сохраняем страницы
+        for _, child in ipairs(container:GetChildren()) do child:Destroy() end
         local pagesCopy = {}
-        for name, data in pairs(pages) do
-            pagesCopy[name] = data
-        end
+        for name, data in pairs(pages) do pagesCopy[name] = data end
         pages = {}
-        
+
         if currentScale.tabsLeft then
-            -- === РЕЖИМ С КНОПКАМИ СЛЕВА ===
-            
             leftPanel = Instance.new("Frame")
-            leftPanel.Name = "LeftPanel"
             leftPanel.Size = UDim2.new(0, 180, 1, 0)
             leftPanel.BackgroundColor3 = Color3.fromRGB(40, 40, 48)
-            leftPanel.BackgroundTransparency = 0
             leftPanel.BorderSizePixel = 0
             leftPanel.Parent = container
-            
-            local leftCorner = Instance.new("UICorner")
-            leftCorner.CornerRadius = UDim.new(0, 8)
-            leftCorner.Parent = leftPanel
-            
-            local leftMask = Instance.new("Frame")
-            leftMask.Size = UDim2.new(0, 8, 1, 0)
-            leftMask.Position = UDim2.new(1, -8, 0, 0)
-            leftMask.BackgroundColor3 = leftPanel.BackgroundColor3
-            leftMask.BackgroundTransparency = 0
-            leftMask.BorderSizePixel = 0
-            leftMask.Parent = leftPanel
+            local leftCorner = Instance.new("UICorner"); leftCorner.CornerRadius = UDim.new(0, 8); leftCorner.Parent = leftPanel
             
             leftScrolling = Instance.new("ScrollingFrame")
             leftScrolling.Size = UDim2.new(1, 0, 1, 0)
@@ -227,196 +147,96 @@ local function createMainFrame(title)
             leftScrolling.BorderSizePixel = 0
             leftScrolling.ScrollBarThickness = 4
             leftScrolling.ScrollBarImageColor3 = COLORS.Accent
-            leftScrolling.CanvasSize = UDim2.new(0, 0, 0, 0)
             leftScrolling.Parent = leftPanel
-            
+
             local leftLayout = Instance.new("UIListLayout")
             leftLayout.Padding = UDim.new(0, 4)
-            leftLayout.SortOrder = Enum.SortOrder.LayoutOrder
             leftLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-            leftLayout.VerticalAlignment = Enum.VerticalAlignment.Top
             leftLayout.Parent = leftScrolling
-            
+
             rightPanel = Instance.new("Frame")
-            rightPanel.Name = "RightPanel"
             rightPanel.Size = UDim2.new(1, -180, 1, 0)
             rightPanel.Position = UDim2.new(0, 180, 0, 0)
             rightPanel.BackgroundColor3 = COLORS.Background
-            rightPanel.BackgroundTransparency = 0
             rightPanel.BorderSizePixel = 0
             rightPanel.Parent = container
-            
-            local rightCorner = Instance.new("UICorner")
-            rightCorner.CornerRadius = UDim.new(0, 8)
-            rightCorner.Parent = rightPanel
-            
-            local rightMask = Instance.new("Frame")
-            rightMask.Size = UDim2.new(0, 8, 1, 0)
-            rightMask.Position = UDim2.new(0, 0, 0, 0)
-            rightMask.BackgroundColor3 = rightPanel.BackgroundColor3
-            rightMask.BackgroundTransparency = 0
-            rightMask.BorderSizePixel = 0
-            rightMask.Parent = rightPanel
-            
+
             pagesScrolling = Instance.new("ScrollingFrame")
-            pagesScrolling.Name = "PagesScrolling"
             pagesScrolling.Size = UDim2.new(1, 0, 1, 0)
             pagesScrolling.BackgroundTransparency = 1
             pagesScrolling.BorderSizePixel = 0
             pagesScrolling.ScrollBarThickness = 6
             pagesScrolling.ScrollBarImageColor3 = COLORS.Accent
-            pagesScrolling.CanvasSize = UDim2.new(0, 0, 0, 0)
             pagesScrolling.Parent = rightPanel
-            
+
             pagesContainer = Instance.new("Frame")
-            pagesContainer.Name = "PagesContainer"
             pagesContainer.Size = UDim2.new(1, -16, 1, 0)
             pagesContainer.Position = UDim2.new(0, 8, 0, 0)
             pagesContainer.BackgroundTransparency = 1
             pagesContainer.Parent = pagesScrolling
-            
-            -- Восстанавливаем страницы
+
             for name, data in pairs(pagesCopy) do
-                if data and data.Frame then
-                    data.Frame.Parent = pagesContainer
-                    data.Frame.Visible = false
-                end
-                if data and data.Button then
-                    data.Button.Parent = leftScrolling
-                    data.Button.Size = UDim2.new(0, 140, 0, 36)
-                    data.Button.BackgroundColor3 = COLORS.TabInactive
-                    data.Button.TextColor3 = COLORS.TextDim
-                end
+                if data and data.Frame then data.Frame.Parent = pagesContainer; data.Frame.Visible = false end
+                if data and data.Button then data.Button.Parent = leftScrolling; data.Button.Size = UDim2.new(0, 140, 0, 36) end
                 pages[name] = data
             end
-            
-            -- Обновляем CanvasSize левой панели
-            local totalHeight = 0
-            for _, data in pairs(pages) do
-                if data and data.Button then
-                    totalHeight = totalHeight + 40
-                end
-            end
-            leftScrolling.CanvasSize = UDim2.new(0, 0, 0, totalHeight)
-            
         else
-            -- === РЕЖИМ С КНОПКАМИ СВЕРХУ ===
-            
             topTabsPanel = Instance.new("Frame")
-            topTabsPanel.Name = "TopTabsPanel"
             topTabsPanel.Size = UDim2.new(1, 0, 0, 50)
             topTabsPanel.BackgroundColor3 = Color3.fromRGB(40, 40, 48)
-            topTabsPanel.BackgroundTransparency = 0
             topTabsPanel.BorderSizePixel = 0
             topTabsPanel.Parent = container
-            
-            local topTabsCorner = Instance.new("UICorner")
-            topTabsCorner.CornerRadius = UDim.new(0, 8)
-            topTabsCorner.Parent = topTabsPanel
-            
+
             topTabsScrolling = Instance.new("ScrollingFrame")
             topTabsScrolling.Size = UDim2.new(1, 0, 1, 0)
             topTabsScrolling.BackgroundTransparency = 1
             topTabsScrolling.BorderSizePixel = 0
-            topTabsScrolling.ScrollBarThickness = 4
-            topTabsScrolling.ScrollBarImageColor3 = COLORS.Accent
-            topTabsScrolling.CanvasSize = UDim2.new(0, 0, 0, 0)
             topTabsScrolling.Parent = topTabsPanel
             topTabsScrolling.ScrollingDirection = Enum.ScrollingDirection.X
-            
+
             local topTabsLayout = Instance.new("UIListLayout")
             topTabsLayout.Padding = UDim.new(0, 4)
-            topTabsLayout.SortOrder = Enum.SortOrder.LayoutOrder
             topTabsLayout.FillDirection = Enum.FillDirection.Horizontal
-            topTabsLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-            topTabsLayout.VerticalAlignment = Enum.VerticalAlignment.Center
             topTabsLayout.Parent = topTabsScrolling
-            
+
             bottomContent = Instance.new("Frame")
-            bottomContent.Name = "BottomContent"
             bottomContent.Size = UDim2.new(1, 0, 1, -50)
             bottomContent.Position = UDim2.new(0, 0, 0, 50)
             bottomContent.BackgroundColor3 = COLORS.Background
-            bottomContent.BackgroundTransparency = 0
             bottomContent.BorderSizePixel = 0
             bottomContent.Parent = container
-            
-            local bottomCorner = Instance.new("UICorner")
-            bottomCorner.CornerRadius = UDim.new(0, 8)
-            bottomCorner.Parent = bottomContent
-            
+
             bottomScrolling = Instance.new("ScrollingFrame")
-            bottomScrolling.Name = "BottomScrolling"
             bottomScrolling.Size = UDim2.new(1, 0, 1, 0)
             bottomScrolling.BackgroundTransparency = 1
             bottomScrolling.BorderSizePixel = 0
-            bottomScrolling.ScrollBarThickness = 6
-            bottomScrolling.ScrollBarImageColor3 = COLORS.Accent
-            bottomScrolling.CanvasSize = UDim2.new(0, 0, 0, 0)
             bottomScrolling.Parent = bottomContent
-            
+
             bottomContainer = Instance.new("Frame")
-            bottomContainer.Name = "BottomContainer"
             bottomContainer.Size = UDim2.new(1, -16, 1, 0)
             bottomContainer.Position = UDim2.new(0, 8, 0, 0)
             bottomContainer.BackgroundTransparency = 1
             bottomContainer.Parent = bottomScrolling
-            
-            -- Восстанавливаем страницы
+
             for name, data in pairs(pagesCopy) do
-                if data and data.Frame then
-                    data.Frame.Parent = bottomContainer
-                    data.Frame.Visible = false
-                end
-                if data and data.Button then
-                    data.Button.Parent = topTabsScrolling
-                    data.Button.Size = UDim2.new(0, 140, 0, 36)
-                    data.Button.BackgroundColor3 = COLORS.TabInactive
-                    data.Button.TextColor3 = COLORS.TextDim
-                end
+                if data and data.Frame then data.Frame.Parent = bottomContainer; data.Frame.Visible = false end
+                if data and data.Button then data.Button.Parent = topTabsScrolling; data.Button.Size = UDim2.new(0, 140, 0, 36) end
                 pages[name] = data
             end
-            
-            -- Обновляем CanvasSize верхней панели
-            local totalWidth = 0
-            for _, data in pairs(pages) do
-                if data and data.Button then
-                    totalWidth = totalWidth + 144
-                end
-            end
-            topTabsScrolling.CanvasSize = UDim2.new(0, totalWidth, 0, 0)
         end
-        
-        -- Активируем первую страницу
+
         if activePage and pages[activePage] then
-            if pages[activePage].Frame then
-                pages[activePage].Frame.Visible = true
-            end
-            if pages[activePage].Button then
-                pages[activePage].Button.BackgroundColor3 = COLORS.TabActive
-                pages[activePage].Button.TextColor3 = COLORS.Text
-            end
+            if pages[activePage].Frame then pages[activePage].Frame.Visible = true end
         else
             for name, data in pairs(pages) do
-                if data and data.Frame then
-                    data.Frame.Visible = true
-                    activePage = name
-                    if data.Button then
-                        data.Button.BackgroundColor3 = COLORS.TabActive
-                        data.Button.TextColor3 = COLORS.Text
-                    end
-                    break
-                end
+                if data and data.Frame then data.Frame.Visible = true; activePage = name; break end
             end
         end
-        
         updatePagesCanvas()
     end
-    
-    -- Строим интерфейс
+
     buildInterface()
-    
-    -- === ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ ===
+
     local function createElementContainer(parent)
         local frame = Instance.new("Frame")
         frame.Size = UDim2.new(1, 0, 0, 44)
@@ -424,100 +244,18 @@ local function createMainFrame(title)
         frame.Parent = parent
         return frame
     end
-    
-    -- === 1) КНОПКА С БИНДОМ ===
-    function UIFramework:CreateToggleWithBind(page, label, defaultState, bindKey)
+
+    function UIFramework:CreateToggle(page, label, defaultState, callback)
         defaultState = defaultState or false
         local container = createElementContainer(page)
-        
+
         local toggleFrame = Instance.new("Frame")
         toggleFrame.Size = UDim2.new(1, -16, 0, 36)
         toggleFrame.Position = UDim2.new(0, 8, 0, 4)
         toggleFrame.BackgroundColor3 = COLORS.TabInactive
-        toggleFrame.BackgroundTransparency = 0
-        toggleFrame.BorderSizePixel = 0
         toggleFrame.Parent = container
-        
-        local corner = Instance.new("UICorner")
-        corner.CornerRadius = UDim.new(0, 4)
-        corner.Parent = toggleFrame
-        
-        local labelText = Instance.new("TextLabel")
-        labelText.Size = UDim2.new(0.6, 0, 1, 0)
-        labelText.Position = UDim2.new(0, 8, 0, 0)
-        labelText.BackgroundTransparency = 1
-        labelText.Text = label .. " [" .. string.upper(bindKey) .. "]"
-        labelText.TextColor3 = COLORS.Text
-        labelText.TextSize = 14
-        labelText.TextXAlignment = Enum.TextXAlignment.Left
-        labelText.Font = Enum.Font.GothamSemibold
-        labelText.Parent = toggleFrame
-        
-        local state = defaultState
-        local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(0, 60, 0, 28)
-        btn.Position = UDim2.new(1, -68, 0.5, -14)
-        btn.BackgroundColor3 = state and COLORS.Green or COLORS.Red
-        btn.BackgroundTransparency = 0
-        btn.BorderSizePixel = 0
-        btn.Text = state and "ON" or "OFF"
-        btn.TextColor3 = COLORS.Text
-        btn.TextSize = 12
-        btn.Font = Enum.Font.GothamBold
-        btn.Parent = toggleFrame
-        
-        local btnCorner = Instance.new("UICorner")
-        btnCorner.CornerRadius = UDim.new(0, 4)
-        btnCorner.Parent = btn
-        
-        local function toggle()
-            state = not state
-            btn.BackgroundColor3 = state and COLORS.Green or COLORS.Red
-            btn.Text = state and "ON" or "OFF"
-        end
-        
-        btn.MouseButton1Click:Connect(toggle)
-        
-        local connection
-        connection = game:GetService("UserInputService").InputBegan:Connect(function(input, gameProcessed)
-            if gameProcessed then return end
-            if input.KeyCode == Enum.KeyCode[bindKey] then
-                toggle()
-            end
-        end)
-        
-        task.wait(0.05)
-        updatePagesCanvas()
-        
-        return {
-            Toggle = toggle,
-            SetState = function(newState)
-                state = newState
-                btn.BackgroundColor3 = state and COLORS.Green or COLORS.Red
-                btn.Text = state and "ON" or "OFF"
-            end,
-            GetState = function() return state end,
-            Connection = connection
-        }
-    end
-    
-    -- === 2) КНОПКА БЕЗ БИНДА ===
-    function UIFramework:CreateToggle(page, label, defaultState)
-        defaultState = defaultState or false
-        local container = createElementContainer(page)
-        
-        local toggleFrame = Instance.new("Frame")
-        toggleFrame.Size = UDim2.new(1, -16, 0, 36)
-        toggleFrame.Position = UDim2.new(0, 8, 0, 4)
-        toggleFrame.BackgroundColor3 = COLORS.TabInactive
-        toggleFrame.BackgroundTransparency = 0
-        toggleFrame.BorderSizePixel = 0
-        toggleFrame.Parent = container
-        
-        local corner = Instance.new("UICorner")
-        corner.CornerRadius = UDim.new(0, 4)
-        corner.Parent = toggleFrame
-        
+        local corner = Instance.new("UICorner"); corner.CornerRadius = UDim.new(0, 4); corner.Parent = toggleFrame
+
         local labelText = Instance.new("TextLabel")
         labelText.Size = UDim2.new(0.6, 0, 1, 0)
         labelText.Position = UDim2.new(0, 8, 0, 0)
@@ -528,216 +266,53 @@ local function createMainFrame(title)
         labelText.TextXAlignment = Enum.TextXAlignment.Left
         labelText.Font = Enum.Font.GothamSemibold
         labelText.Parent = toggleFrame
-        
+
         local state = defaultState
         local btn = Instance.new("TextButton")
         btn.Size = UDim2.new(0, 60, 0, 28)
         btn.Position = UDim2.new(1, -68, 0.5, -14)
         btn.BackgroundColor3 = state and COLORS.Green or COLORS.Red
-        btn.BackgroundTransparency = 0
         btn.BorderSizePixel = 0
         btn.Text = state and "ON" or "OFF"
         btn.TextColor3 = COLORS.Text
         btn.TextSize = 12
         btn.Font = Enum.Font.GothamBold
         btn.Parent = toggleFrame
-        
-        local btnCorner = Instance.new("UICorner")
-        btnCorner.CornerRadius = UDim.new(0, 4)
-        btnCorner.Parent = btn
-        
+        local btnCorner = Instance.new("UICorner"); btnCorner.CornerRadius = UDim.new(0, 4); btnCorner.Parent = btn
+
         local function toggle()
             state = not state
             btn.BackgroundColor3 = state and COLORS.Green or COLORS.Red
             btn.Text = state and "ON" or "OFF"
+            if callback then callback(state) end
         end
-        
+
         btn.MouseButton1Click:Connect(toggle)
-        
-        task.wait(0.05)
-        updatePagesCanvas()
-        
+        task.wait(0.05); updatePagesCanvas()
+
         return {
             Toggle = toggle,
             SetState = function(newState)
                 state = newState
                 btn.BackgroundColor3 = state and COLORS.Green or COLORS.Red
                 btn.Text = state and "ON" or "OFF"
+                if callback then callback(state) end
             end,
             GetState = function() return state end
         }
     end
-    
-    -- === 3) ПОЛЗУНОК ===
-    function UIFramework:CreateSlider(page, label, min, max, default)
-        local container = createElementContainer(page)
-        container.Size = UDim2.new(1, 0, 0, 54)
-        
-        local sliderFrame = Instance.new("Frame")
-        sliderFrame.Size = UDim2.new(1, -16, 0, 46)
-        sliderFrame.Position = UDim2.new(0, 8, 0, 4)
-        sliderFrame.BackgroundColor3 = COLORS.TabInactive
-        sliderFrame.BackgroundTransparency = 0
-        sliderFrame.BorderSizePixel = 0
-        sliderFrame.Parent = container
-        
-        local corner = Instance.new("UICorner")
-        corner.CornerRadius = UDim.new(0, 4)
-        corner.Parent = sliderFrame
-        
-        local labelText = Instance.new("TextLabel")
-        labelText.Size = UDim2.new(0.5, 0, 0, 20)
-        labelText.Position = UDim2.new(0, 8, 0, 2)
-        labelText.BackgroundTransparency = 1
-        labelText.Text = label
-        labelText.TextColor3 = COLORS.Text
-        labelText.TextSize = 13
-        labelText.TextXAlignment = Enum.TextXAlignment.Left
-        labelText.Font = Enum.Font.GothamSemibold
-        labelText.Parent = sliderFrame
-        
-        local valueLabel = Instance.new("TextLabel")
-        valueLabel.Size = UDim2.new(0.3, 0, 0, 20)
-        valueLabel.Position = UDim2.new(0.7, 0, 0, 2)
-        valueLabel.BackgroundTransparency = 1
-        valueLabel.Text = tostring(default or min)
-        valueLabel.TextColor3 = COLORS.Accent
-        valueLabel.TextSize = 13
-        valueLabel.TextXAlignment = Enum.TextXAlignment.Right
-        valueLabel.Font = Enum.Font.GothamBold
-        valueLabel.Parent = sliderFrame
-        
-        -- Полоса
-        local slider = Instance.new("Frame")
-        slider.Size = UDim2.new(0.9, 0, 0, 4)
-        slider.Position = UDim2.new(0.05, 0, 1, -10)
-        slider.BackgroundColor3 = Color3.fromRGB(60, 60, 70)
-        slider.BackgroundTransparency = 0
-        slider.BorderSizePixel = 0
-        slider.Parent = sliderFrame
-        
-        local sliderCorner = Instance.new("UICorner")
-        sliderCorner.CornerRadius = UDim.new(0, 2)
-        sliderCorner.Parent = slider
-        
-        -- Заполнение
-        local fill = Instance.new("Frame")
-        fill.Size = UDim2.new(0.5, 0, 1, 0)
-        fill.BackgroundColor3 = COLORS.Accent
-        fill.BackgroundTransparency = 0
-        fill.BorderSizePixel = 0
-        fill.Parent = slider
-        
-        local fillCorner = Instance.new("UICorner")
-        fillCorner.CornerRadius = UDim.new(0, 2)
-        fillCorner.Parent = fill
-        
-        -- Ручка
-        local handle = Instance.new("Frame")
-        handle.Size = UDim2.new(0, 16, 0, 16)
-        handle.Position = UDim2.new(0.5, -8, 0.5, -8)
-        handle.BackgroundColor3 = COLORS.Accent
-        handle.BackgroundTransparency = 0
-        handle.BorderSizePixel = 0
-        handle.Parent = fill
-        
-        local handleCorner = Instance.new("UICorner")
-        handleCorner.CornerRadius = UDim.new(1, 0)
-        handleCorner.Parent = handle
-        
-        local handleBorder = Instance.new("Frame")
-        handleBorder.Size = UDim2.new(1, 0, 1, 0)
-        handleBorder.BackgroundColor3 = COLORS.Text
-        handleBorder.BackgroundTransparency = 0
-        handleBorder.BorderSizePixel = 0
-        handleBorder.Parent = handle
-        
-        local handleBorderCorner = Instance.new("UICorner")
-        handleBorderCorner.CornerRadius = UDim.new(1, 0)
-        handleBorderCorner.Parent = handleBorder
-        
-        if type(default) == "table" then
-            default = min
-        end
-        default = default or min
-        
-        local value = math.round(default)
-        local function updateSlider(newValue)
-            if type(newValue) == "table" then
-                newValue = min
-            end
-            value = math.round(math.clamp(newValue, min, max))
-            local percentage = (value - min) / (max - min)
-            fill.Size = UDim2.new(percentage, 0, 1, 0)
-            valueLabel.Text = tostring(value)
-        end
-        
-        updateSlider(value)
-        
-        local dragging = false
-        local function startDrag(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                dragging = true
-                local mousePos = input.Position.X
-                local sliderPos = slider.AbsolutePosition.X
-                local sliderWidth = slider.AbsoluteSize.X
-                local percentage = math.clamp((mousePos - sliderPos) / sliderWidth, 0, 1)
-                local newValue = min + (max - min) * percentage
-                updateSlider(newValue)
-            end
-        end
-        
-        local function moveDrag(input)
-            if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-                local mousePos = input.Position.X
-                local sliderPos = slider.AbsolutePosition.X
-                local sliderWidth = slider.AbsoluteSize.X
-                local percentage = math.clamp((mousePos - sliderPos) / sliderWidth, 0, 1)
-                local newValue = min + (max - min) * percentage
-                updateSlider(newValue)
-            end
-        end
-        
-        local function endDrag(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                dragging = false
-            end
-        end
-        
-        slider.InputBegan:Connect(startDrag)
-        slider.InputEnded:Connect(endDrag)
-        handle.InputBegan:Connect(startDrag)
-        handle.InputEnded:Connect(endDrag)
-        handleBorder.InputBegan:Connect(startDrag)
-        handleBorder.InputEnded:Connect(endDrag)
-        
-        local inputService = game:GetService("UserInputService")
-        inputService.InputChanged:Connect(moveDrag)
-        inputService.InputEnded:Connect(endDrag)
-        
-        task.wait(0.05)
-        updatePagesCanvas()
-        
-        return {
-            SetValue = updateSlider,
-            GetValue = function() return value end
-        }
-    end
-    
-    -- === 4) КНОПКА-СПИСОК ===
-    function UIFramework:CreateDropdown(page, label, options, defaultOption, multiSelect)
+
+    function UIFramework:CreateDropdown(page, label, options, defaultOption, multiSelect, callback)
         multiSelect = multiSelect or false
-        
         local container = Instance.new("Frame")
         container.Size = UDim2.new(1, 0, 0, 44)
         container.BackgroundTransparency = 1
         container.Parent = page
-        
+
         local mainBtn = Instance.new("TextButton")
         mainBtn.Size = UDim2.new(1, -16, 0, 36)
         mainBtn.Position = UDim2.new(0, 8, 0, 4)
         mainBtn.BackgroundColor3 = COLORS.TabInactive
-        mainBtn.BackgroundTransparency = 0
         mainBtn.BorderSizePixel = 0
         mainBtn.Text = label .. ": " .. tostring(defaultOption or "Выберите...")
         mainBtn.TextColor3 = COLORS.Text
@@ -745,12 +320,8 @@ local function createMainFrame(title)
         mainBtn.TextXAlignment = Enum.TextXAlignment.Left
         mainBtn.Font = Enum.Font.GothamSemibold
         mainBtn.Parent = container
-        mainBtn.ZIndex = 2
-        
-        local mainCorner = Instance.new("UICorner")
-        mainCorner.CornerRadius = UDim.new(0, 4)
-        mainCorner.Parent = mainBtn
-        
+        local mainCorner = Instance.new("UICorner"); mainCorner.CornerRadius = UDim.new(0, 4); mainCorner.Parent = mainBtn
+
         local arrow = Instance.new("TextLabel")
         arrow.Size = UDim2.new(0, 30, 0, 36)
         arrow.Position = UDim2.new(1, -36, 0, 0)
@@ -761,92 +332,57 @@ local function createMainFrame(title)
         arrow.TextXAlignment = Enum.TextXAlignment.Center
         arrow.Font = Enum.Font.GothamBold
         arrow.Parent = mainBtn
-        arrow.ZIndex = 2
-        
+
         local listFrame = Instance.new("Frame")
         listFrame.Size = UDim2.new(1, -16, 0, 0)
         listFrame.Position = UDim2.new(0, 8, 0, 40)
         listFrame.BackgroundColor3 = COLORS.TabInactive
-        listFrame.BackgroundTransparency = 0
         listFrame.BorderSizePixel = 0
         listFrame.Visible = false
         listFrame.Parent = container
-        listFrame.ZIndex = 10
         listFrame.ClipsDescendants = true
-        
-        local listCorner = Instance.new("UICorner")
-        listCorner.CornerRadius = UDim.new(0, 4)
-        listCorner.Parent = listFrame
-        
-        local listShadow = Instance.new("Frame")
-        listShadow.Size = UDim2.new(1, 0, 1, 0)
-        listShadow.Position = UDim2.new(0, 4, 0, 4)
-        listShadow.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-        listShadow.BackgroundTransparency = 0.5
-        listShadow.BorderSizePixel = 0
-        listShadow.ZIndex = 9
-        listShadow.Parent = listFrame
-        
-        local listShadowCorner = Instance.new("UICorner")
-        listShadowCorner.CornerRadius = UDim.new(0, 4)
-        listShadowCorner.Parent = listShadow
-        
+        local listCorner = Instance.new("UICorner"); listCorner.CornerRadius = UDim.new(0, 4); listCorner.Parent = listFrame
+
         local listScrolling = Instance.new("ScrollingFrame")
         listScrolling.Size = UDim2.new(1, 0, 1, 0)
         listScrolling.BackgroundTransparency = 1
         listScrolling.BorderSizePixel = 0
         listScrolling.ScrollBarThickness = 4
-        listScrolling.ScrollBarImageColor3 = COLORS.Accent
-        listScrolling.CanvasSize = UDim2.new(0, 0, 0, 0)
         listScrolling.Parent = listFrame
-        listScrolling.ZIndex = 10
         
         local listLayout = Instance.new("UIListLayout")
         listLayout.Padding = UDim.new(0, 2)
-        listLayout.SortOrder = Enum.SortOrder.LayoutOrder
         listLayout.Parent = listScrolling
-        
+
         local selected = defaultOption
         local isOpen = false
         local buttons = {}
-        
+
         local function updateMainText()
             if multiSelect then
                 local count = 0
-                if type(selected) == "table" then
-                    for _, v in pairs(selected) do
-                        if v then count = count + 1 end
-                    end
-                end
+                if type(selected) == "table" then for _, v in pairs(selected) do if v then count = count + 1 end end end
                 mainBtn.Text = label .. ": " .. (count > 0 and ("Выбрано " .. count) or "Ничего не выбрано")
             else
-                if type(selected) == "table" then
-                    mainBtn.Text = label .. ": Выберите..."
-                else
-                    mainBtn.Text = label .. ": " .. tostring(selected or "Выберите...")
-                end
+                mainBtn.Text = label .. ": " .. tostring(selected or "Выберите...")
             end
         end
-        
+
         local function updateListSize()
             local count = 0
-            for _ in pairs(buttons) do
-                count = count + 1
-            end
+            for _ in pairs(buttons) do count = count + 1 end
             local maxHeight = math.min(count * 30 + 4, 150)
             listScrolling.CanvasSize = UDim2.new(0, 0, 0, count * 30 + 4)
             listFrame.Size = UDim2.new(1, -16, 0, maxHeight)
             container.Size = UDim2.new(1, 0, 0, 44 + (isOpen and maxHeight or 0))
-            task.wait(0.05)
-            updatePagesCanvas()
+            task.wait(0.05); updatePagesCanvas()
         end
-        
+
         for _, option in ipairs(options) do
             local btn = Instance.new("TextButton")
             btn.Size = UDim2.new(1, -8, 0, 28)
             btn.Position = UDim2.new(0, 4, 0, 0)
             btn.BackgroundColor3 = COLORS.TabInactive
-            btn.BackgroundTransparency = 0
             btn.BorderSizePixel = 0
             btn.Text = option
             btn.TextColor3 = COLORS.Text
@@ -854,379 +390,143 @@ local function createMainFrame(title)
             btn.TextXAlignment = Enum.TextXAlignment.Left
             btn.Font = Enum.Font.GothamSemibold
             btn.Parent = listScrolling
-            btn.ZIndex = 10
-            
-            local btnCorner = Instance.new("UICorner")
-            btnCorner.CornerRadius = UDim.new(0, 3)
-            btnCorner.Parent = btn
-            
+
+            local btnCorner = Instance.new("UICorner"); btnCorner.CornerRadius = UDim.new(0, 3); btnCorner.Parent = btn
             local check = Instance.new("TextLabel")
             check.Size = UDim2.new(0, 20, 1, 0)
             check.Position = UDim2.new(1, -24, 0, 0)
             check.BackgroundTransparency = 1
             check.Text = "✓"
             check.TextColor3 = COLORS.Accent
-            check.TextSize = 14
-            check.TextXAlignment = Enum.TextXAlignment.Center
-            check.Font = Enum.Font.GothamBold
             check.Visible = false
             check.Parent = btn
-            check.ZIndex = 10
-            
-            buttons[option] = {
-                Button = btn,
-                Check = check
-            }
-            
+
+            buttons[option] = { Button = btn, Check = check }
+
             btn.MouseButton1Click:Connect(function()
                 if multiSelect then
-                    if type(selected) ~= "table" then
-                        selected = {}
-                    end
+                    if type(selected) ~= "table" then selected = {} end
                     selected[option] = not selected[option]
                     check.Visible = selected[option]
                     updateMainText()
+                    if callback then callback(selected) end
                 else
                     selected = option
                     for opt, data in pairs(buttons) do
                         data.Button.BackgroundColor3 = COLORS.TabInactive
-                        data.Button.TextColor3 = COLORS.Text
                         data.Check.Visible = false
                     end
                     btn.BackgroundColor3 = COLORS.Accent
-                    btn.TextColor3 = COLORS.Text
                     check.Visible = true
                     updateMainText()
                     isOpen = false
                     listFrame.Visible = false
                     arrow.Text = "▼"
                     updateListSize()
+                    if callback then callback(selected) end
                 end
             end)
         end
-        
-        if not multiSelect then
-            for opt, data in pairs(buttons) do
-                if opt == defaultOption then
-                    data.Button.BackgroundColor3 = COLORS.Accent
-                    data.Button.TextColor3 = COLORS.Text
-                    data.Check.Visible = true
-                end
-            end
-        elseif type(defaultOption) == "table" then
-            for opt, data in pairs(buttons) do
-                if defaultOption[opt] then
-                    data.Check.Visible = true
-                end
-            end
-        end
-        
+
         mainBtn.MouseButton1Click:Connect(function()
             isOpen = not isOpen
             listFrame.Visible = isOpen
             arrow.Text = isOpen and "▲" or "▼"
             updateListSize()
         end)
-        
-        updateMainText()
-        updateListSize()
-        task.wait(0.05)
-        updatePagesCanvas()
-        
+
+        updateMainText(); updateListSize()
+        task.wait(0.05); updatePagesCanvas()
+
         return {
-            GetSelected = function()
-                if multiSelect then
-                    local result = {}
-                    if type(selected) == "table" then
-                        for opt, val in pairs(selected) do
-                            if val then table.insert(result, opt) end
-                        end
-                    end
-                    return result
-                else
-                    return selected
-                end
-            end,
+            GetSelected = function() return selected end,
             SetSelected = function(newValue)
-                if multiSelect then
-                    selected = {}
-                    if type(newValue) == "table" then
-                        for _, opt in ipairs(newValue) do
-                            selected[opt] = true
-                        end
-                    end
-                    for opt, data in pairs(buttons) do
-                        data.Check.Visible = selected[opt] or false
-                    end
-                    updateMainText()
-                else
-                    if type(newValue) == "table" then
-                        newValue = nil
-                    end
-                    selected = newValue
-                    for opt, data in pairs(buttons) do
-                        data.Button.BackgroundColor3 = COLORS.TabInactive
-                        data.Button.TextColor3 = COLORS.Text
-                        data.Check.Visible = false
-                    end
-                    if buttons[newValue] then
-                        buttons[newValue].Button.BackgroundColor3 = COLORS.Accent
-                        buttons[newValue].Button.TextColor3 = COLORS.Text
-                        buttons[newValue].Check.Visible = true
-                    end
-                    updateMainText()
-                end
+                selected = newValue
+                updateMainText()
+                if callback then callback(selected) end
             end
         }
     end
-    
-    -- === СТРАНИЦЫ ===
+
     function UIFramework:CreatePage(name)
         local pageFrame = Instance.new("Frame")
-        pageFrame.Name = "PageFrame"
         pageFrame.Size = UDim2.new(1, 0, 0, 0)
         pageFrame.BackgroundTransparency = 1
         pageFrame.Visible = false
         pageFrame.Parent = currentScale.tabsLeft and pagesContainer or bottomContainer
-        
+
         local pageLayout = Instance.new("UIListLayout")
         pageLayout.Padding = UDim.new(0, 4)
-        pageLayout.SortOrder = Enum.SortOrder.LayoutOrder
         pageLayout.Parent = pageFrame
-        
+
         local function updatePageSize()
             local totalHeight = 16
             for _, child in ipairs(pageFrame:GetChildren()) do
-                if child:IsA("Frame") then
-                    totalHeight = totalHeight + child.Size.Y.Offset + 4
-                end
+                if child:IsA("Frame") then totalHeight = totalHeight + child.Size.Y.Offset + 4 end
             end
             pageFrame.Size = UDim2.new(1, 0, 0, totalHeight)
             updatePagesCanvas()
         end
-        
-        pageFrame.ChildAdded:Connect(function()
-            task.wait(0.05)
-            updatePageSize()
-        end)
-        
-        -- Кнопка вкладки
+
+        pageFrame.ChildAdded:Connect(function() task.wait(0.05); updatePageSize() end)
+
         local tabBtn = Instance.new("TextButton")
-        tabBtn.Name = name .. "Tab"
         tabBtn.Size = UDim2.new(0, 140, 0, 36)
         tabBtn.BackgroundColor3 = COLORS.TabInactive
-        tabBtn.BackgroundTransparency = 0
         tabBtn.BorderSizePixel = 0
         tabBtn.Text = name
         tabBtn.TextColor3 = COLORS.TextDim
-        tabBtn.TextSize = 14
-        tabBtn.TextXAlignment = Enum.TextXAlignment.Center
-        tabBtn.TextYAlignment = Enum.TextYAlignment.Center
-        tabBtn.TextTruncate = Enum.TextTruncate.AtEnd
         tabBtn.Font = Enum.Font.GothamSemibold
         tabBtn.Parent = currentScale.tabsLeft and leftScrolling or topTabsScrolling
-        
-        local tabCorner = Instance.new("UICorner")
-        tabCorner.CornerRadius = UDim.new(0, 4)
-        tabCorner.Parent = tabBtn
-        
-        -- Обновляем CanvasSize
-        if currentScale.tabsLeft then
-            leftScrolling.CanvasSize = UDim2.new(0, 0, 0, leftScrolling.CanvasSize.Y.Offset + 40)
-        else
-            topTabsScrolling.CanvasSize = UDim2.new(0, 0, 0, topTabsScrolling.CanvasSize.Y.Offset + 40)
-        end
-        
-        tabBtn.MouseButton1Click:Connect(function()
-            UIFramework:SwitchPage(name)
-        end)
-        
-        pages[name] = {
-            Frame = pageFrame,
-            Button = tabBtn,
-            Layout = pageLayout,
-            UpdateSize = updatePageSize
-        }
-        
-        if not activePage then
-            activePage = name
-            pageFrame.Visible = true
-            tabBtn.BackgroundColor3 = COLORS.TabActive
-            tabBtn.TextColor3 = COLORS.Text
-        end
-        
-        task.wait(0.1)
-        updatePageSize()
-        
+        local tabCorner = Instance.new("UICorner"); tabCorner.CornerRadius = UDim.new(0, 4); tabCorner.Parent = tabBtn
+
+        tabBtn.MouseButton1Click:Connect(function() UIFramework:SwitchPage(name) end)
+
+        pages[name] = { Frame = pageFrame, Button = tabBtn, UpdateSize = updatePageSize }
+        if not activePage then activePage = name; pageFrame.Visible = true end
+
+        task.wait(0.1); updatePageSize()
         return pageFrame, pageLayout
     end
-    
+
     function UIFramework:SwitchPage(name)
         if not pages[name] then return end
-        
         for _, data in pairs(pages) do
-            if data and data.Frame then
-                data.Frame.Visible = false
-            end
-            if data and data.Button then
-                data.Button.BackgroundColor3 = COLORS.TabInactive
-                data.Button.TextColor3 = COLORS.TextDim
-            end
+            if data and data.Frame then data.Frame.Visible = false end
+            if data and data.Button then data.Button.BackgroundColor3 = COLORS.TabInactive; data.Button.TextColor3 = COLORS.TextDim end
         end
-        
-        if pages[name] and pages[name].Frame then
-            pages[name].Frame.Visible = true
-        end
-        if pages[name] and pages[name].Button then
-            pages[name].Button.BackgroundColor3 = COLORS.TabActive
-            pages[name].Button.TextColor3 = COLORS.Text
-        end
+        if pages[name] and pages[name].Frame then pages[name].Frame.Visible = true end
+        if pages[name] and pages[name].Button then pages[name].Button.BackgroundColor3 = COLORS.TabActive; pages[name].Button.TextColor3 = COLORS.Text end
         activePage = name
-        
-        task.wait(0.05)
-        if pages[name] and pages[name].UpdateSize then
-            pages[name]:UpdateSize()
-        end
+        task.wait(0.05); if pages[name] and pages[name].UpdateSize then pages[name]:UpdateSize() end
         updatePagesCanvas()
     end
-    
-    -- === НАСТРОЙКИ ===
-    local settingsPage, settingsLayout = UIFramework:CreatePage("Настройки")
-    
-    -- Выбор масштаба
-    local scaleDropdown = UIFramework:CreateDropdown(settingsPage, "Масштаб", {"3:4", "1:1", "1:2"}, currentScale.name, false)
-    
-    -- Функция смены масштаба
-    local function changeScale(newScaleName)
-        if newScaleName == currentScale.name then return end
-        
-        -- Находим новый масштаб
-        local newScale = nil
-        for _, s in ipairs(SCALES) do
-            if s.name == newScaleName then
-                newScale = s
-                break
-            end
-        end
-        if not newScale then return end
-        
-        -- Меняем текущий масштаб
-        currentScale = newScale
-        
-        -- Меняем размер окна
-        mainFrame.Size = UDim2.new(0, newScale.width, 0, newScale.height)
-        mainFrame.Position = UDim2.new(0.5, -newScale.width/2, 0.5, -newScale.height/2)
-        
-        -- Перестраиваем интерфейс
-        buildInterface()
-        
-        -- Пересоздаём страницу настроек с новыми значениями
-        -- Просто обновляем дропдаун
-        for _, data in pairs(pages) do
-            if data and data.Frame and data.Frame.Parent then
-                -- Обновляем все страницы
-            end
-        end
-        
-        -- Сохраняем
-        saveSettings({scale = newScaleName, toggleKey = toggleKey})
-    end
-    
-    -- Отслеживаем изменение масштаба
-    local oldSetSelected = scaleDropdown.SetSelected
-    scaleDropdown.SetSelected = function(self, newValue)
-        oldSetSelected(self, newValue)
-        local newScale = scaleDropdown:GetSelected()
-        if newScale ~= currentScale.name then
-            changeScale(newScale)
-        end
-    end
-    
-    -- Клавиша для открытия/закрытия
-    local keyOptions = {"RightControl", "LeftControl", "RightShift", "LeftShift", "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12"}
-    local keyDropdown = UIFramework:CreateDropdown(settingsPage, "Клавиша открытия", keyOptions, toggleKey, false)
-    
-    local oldKeySetSelected = keyDropdown.SetSelected
-    keyDropdown.SetSelected = function(self, newValue)
-        oldKeySetSelected(self, newValue)
-        local newKey = keyDropdown:GetSelected()
-        if newKey and newKey ~= toggleKey then
-            toggleKey = newKey
-            saveSettings({scale = currentScale.name, toggleKey = toggleKey})
-        end
-    end
-    
-    -- Бинд на клавишу для открытия/закрытия
-    local function onToggleKey(input, gameProcessed)
+
+    game:GetService("UserInputService").InputBegan:Connect(function(input, gameProcessed)
         if gameProcessed then return end
-        if input.KeyCode == Enum.KeyCode[toggleKey] then
-            mainFrame.Visible = not mainFrame.Visible
-        end
-    end
-    
-    game:GetService("UserInputService").InputBegan:Connect(onToggleKey)
-    
-    -- Перетаскивание
-    local dragging = false
-    local dragStart, startPos
-    
-    topBar.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = true
-            dragStart = input.Position
-            startPos = mainFrame.Position
-        end
+        if input.KeyCode == Enum.KeyCode[toggleKey] then mainFrame.Visible = not mainFrame.Visible end
     end)
-    
+
+    local dragging, dragStart, startPos
+    topBar.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = true; dragStart = input.Position; startPos = mainFrame.Position end
+    end)
     topBar.InputChanged:Connect(function(input)
         if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
             local delta = input.Position - dragStart
-            mainFrame.Position = UDim2.new(
-                startPos.X.Scale, startPos.X.Offset + delta.X,
-                startPos.Y.Scale, startPos.Y.Offset + delta.Y
-            )
+            mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
         end
     end)
-    
-    topBar.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = false
-        end
-    end)
-    
-    uiRef = {
+    topBar.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end end)
+
+    return {
         MainFrame = mainFrame,
-        TopBar = topBar,
-        Container = container,
         CreatePage = UIFramework.CreatePage,
         SwitchPage = UIFramework.SwitchPage,
-        Pages = pages,
-        ScreenGui = screenGui,
-        CreateToggleWithBind = UIFramework.CreateToggleWithBind,
         CreateToggle = UIFramework.CreateToggle,
-        CreateSlider = UIFramework.CreateSlider,
-        CreateDropdown = UIFramework.CreateDropdown,
-        UpdatePagesCanvas = updatePagesCanvas,
-        GetScale = function()
-            return currentScale.name
-        end,
-        GetScales = function()
-            return SCALES
-        end,
-        GetToggleKey = function()
-            return toggleKey
-        end,
-        SetToggleKey = function(newKey)
-            toggleKey = newKey
-            saveSettings({scale = currentScale.name, toggleKey = toggleKey})
-        end
+        CreateDropdown = UIFramework.CreateDropdown
     }
-    
-    return uiRef
 end
 
-function UIFramework.New(title)
-    return createMainFrame(title or "UI Framework")
-end
-
+function UIFramework.New(title) return createMainFrame(title or "UI Framework") end
 return UIFramework
